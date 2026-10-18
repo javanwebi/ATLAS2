@@ -1202,6 +1202,18 @@ export const ProductDetailPage: React.FC = () => {
                 </div>
               )}
 
+              {selectedVariant?.technicalReview && (
+                <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-xs text-slate-600">
+                  <h3 className="font-bold text-[#55565A]">مسیر فنی و منابع این کد کالا</h3>
+                  <p>{selectedVariant.technicalReview.categoryPath.join(' ← ')}</p>
+                  <p className="leading-6">{selectedVariant.technicalReview.note}</p>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedVariant.technicalReview.references.map(ref => <a key={ref.url} href={ref.url} target="_blank" rel="noopener noreferrer" className="text-[#E06518] underline underline-offset-4">{ref.title}</a>)}
+                  </div>
+                  <p className="leading-6">نیازمند تکمیل: {selectedVariant.technicalReview.missing.join('، ')}</p>
+                </section>
+              )}
+
               {/* Shared Family Specs Table */}
               <div className="space-y-3">
                 <div>

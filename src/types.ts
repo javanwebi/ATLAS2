@@ -1,3 +1,4 @@
+import type { TechnicalReview } from './data/productTechnicalData';
 export type UserRole = 'guest' | 'retail' | 'wholesale' | 'dealer' | 'admin';
 
 export type ClubTier = 'bronze' | 'silver' | 'gold';
@@ -78,6 +79,7 @@ export interface Product {
 }
 
 export interface ProductVariant {
+  technicalReview?: TechnicalReview;
   code: string;
   size: string;
   name: string;

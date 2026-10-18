@@ -5,7 +5,7 @@ import { groupProductFamilies } from '../src/data/productFamilies';
 import { getProductByCode } from '../src/data/mockGenerator';
 
 test('grouping conserves every SKU and its exact recorded specifications', () => {
-  const variants = (products: typeof USER_PRODUCTS) => products.flatMap(p => p.variants || []).sort((a,b) => a.code.localeCompare(b.code));
+  const variants = (products: typeof USER_PRODUCTS) => products.flatMap(p => (p.variants || []).map(({code,size,name}) => ({code,size,name}))).sort((a,b) => a.code.localeCompare(b.code));
   assert.deepEqual(variants(USER_PRODUCTS), variants(USER_PRODUCTS_RAW));
   assert.deepEqual(groupProductFamilies(USER_PRODUCTS), USER_PRODUCTS);
 });

@@ -1,3 +1,4 @@
+import { enrichProductTechnicalData } from './productTechnicalData';
 import { groupProductFamilies } from './productFamilies';
 import type { Product } from '../types';
 import source from './catalogueSource.json';
@@ -35,7 +36,7 @@ export const USER_PRODUCTS_RAW: Product[] = source.map(family => {
 export function categorySlugFor(name: string): string {
   return name.trim().replace(/[\s\u200c]+/g, '-');
 }
-export const USER_PRODUCTS = groupProductFamilies(USER_PRODUCTS_RAW);
+export const USER_PRODUCTS = groupProductFamilies(USER_PRODUCTS_RAW).map(enrichProductTechnicalData);
 const familyBySku = new Map(USER_PRODUCTS.flatMap(p => (p.variants || []).map(v => [v.code, p.code] as const)));
 export const PRODUCT_FAMILY_ALIASES = new Map(USER_PRODUCTS_RAW.map(raw => [raw.code.toLowerCase(), familyBySku.get(raw.variants?.[0]?.code || '') || raw.code]));
 export const USER_PRODUCTS_BY_CODE = new Map<string, Product>();
@@ -56,7 +57,7 @@ export const normalizeCatalogueText = (value: string) => value.toLowerCase().rep
 const searchIndex = new Map(USER_PRODUCTS.map(product => [product.code, normalizeCatalogueText([
   product.name, product.code, product.brand, product.categoryName, product.submenu, product.subcategory,
   ...product.technicalSpecs.map(s => s.value),
-  ...(product.variants || []).flatMap(v => [v.code, v.size, v.name]),
+  ...(product.variants || []).flatMap(v => [v.code, v.size, v.name, v.model, ...(v.technicalSpecs || []).map(s => s.value), ...(v.technicalReview?.categoryPath || [])]),
 ].join(' '))]));
 export function matchesProductSearch(product: Product, query: string) {
   const terms = normalizeCatalogueText(query).split(' ').filter(Boolean);

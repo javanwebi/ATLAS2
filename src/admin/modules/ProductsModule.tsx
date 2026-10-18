@@ -1,3 +1,4 @@
+import { enrichTechnicalVariant } from '../../data/productTechnicalData';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -545,6 +546,20 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
     );
   }, [draftFamily, editingVariantCode]);
 
+  const technicalReview = draftFamily && currentEditingVariant ? enrichTechnicalVariant(draftFamily, currentEditingVariant).technicalReview : undefined;
+
+  const downloadTechnicalAudit = () => {
+    const records = products.flatMap(product => (product.variants || []).map(original => {
+      const variant = enrichTechnicalVariant(product, original);
+      return { familyCode: product.code, familyName: product.name, sku: variant.code, name: variant.name,
+        size: variant.size, model: variant.model, specifications: variant.technicalSpecs, review: variant.technicalReview };
+    }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(records, null, 2)], { type: 'application/json;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'sanatpish-technical-review.json'; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const updateCurrentVariant = (updater: (v: ProductVariant) => ProductVariant) => {
     if (!draftFamily || !currentEditingVariant) return;
     const targetCode = currentEditingVariant.code;
@@ -1039,6 +1054,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                 ))}
               </div>
 
+              <button type="button" onClick={downloadTechnicalAudit} className="rounded-lg border border-orange-200 px-3 py-1.5 font-bold text-[#E06518]">خروجی بررسی فنی همه کدها</button>
               <div className="text-slate-500">
                 نمایش <strong>{toPersianDigits(filteredProducts.length)}</strong> خانواده محصول
               </div>
@@ -2459,6 +2475,13 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                   <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-5">
                     {currentEditingVariant ? (
                       <>
+                        {technicalReview && <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3 space-y-2 text-xs leading-6">
+                          <strong>بررسی فنی کد کالا</strong>
+                          <p>{technicalReview.categoryPath.join(' ← ')}</p>
+                          <p>وضعیت: {technicalReview.status === 'reference-enriched' ? 'دارای اطلاعات مرجع پروفیل' : technicalReview.status === 'catalog-extracted' ? 'استخراج از شرح کاتالوگ' : 'نیازمند شناسایی مدل'}</p>
+                          <p>اطلاعات مورد نیاز: {technicalReview.missing.join('، ')}</p>
+                          <div className="flex flex-wrap gap-3">{technicalReview.references.map(ref => <a key={ref.url} href={ref.url} target="_blank" rel="noopener noreferrer" className="underline text-[#E06518]">{ref.title}</a>)}</div>
+                        </div>}
                         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
                           <div>
                             <h4 className="text-sm font-black text-slate-800">

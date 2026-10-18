@@ -1,3 +1,4 @@
+import { enrichProductTechnicalData } from './productTechnicalData';
 import { groupProductFamilies } from './productFamilies';
 import { publicCatalog } from "../utils/catalogPrivacy";
 import { Product, ProductGalleryImage, ProductVariant } from "../types";
@@ -366,7 +367,7 @@ function ensureBrowserCatalogBuilt() {
     }
   }
 
-  cachedAllIncludingInactive = groupProductFamilies(allFamilies);
+  cachedAllIncludingInactive = groupProductFamilies(allFamilies).map(enrichProductTechnicalData);
   cachedProducts = cachedAllIncludingInactive.filter((p) => p.active !== false);
 
   cachedMapIncludingInactive = new Map();
