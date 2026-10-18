@@ -145,7 +145,7 @@ export function enrichTechnicalVariant(product: Product, variant: ProductVariant
   if(rotex){model=`ROTEX ${rotex[1]}`;add('شناسه ROTEX درج‌شده در شرح',model);}
   const explicitModel = name.match(/(?:مدل|MODEL)\s*[:：-]?\s*([A-Z0-9][A-Z0-9./-]*)/);
   if(!model && explicitModel) model=explicitModel[1];
-  if(catalogPartCode) add('کد اختصاصی درج‌شده در شرح کاتالوگ',catalogPartCode);
+  if(catalogPartCode) add('کد موجود در نام اصلی کالا',catalogPartCode);
   const dimensionSequence=name.match(/\d+(?:[./]\d+)?(?:\s*[*×]\s*\d+(?:[./]\d+)?){1,3}/)?.[0];
   if(dimensionSequence) add('توالی ابعاد درج‌شده (محورها و واحد تأیید نشده)',dimensionSequence);
   if(technicalCode) add('کد فنی خوانده‌شده از شرح کالا',technicalCode);

@@ -87,3 +87,16 @@ test('catalog markings preserve letter suffixes and Persian drawing prefixes',()
  const c=enrichTechnicalVariant(belt,{code:'z',name:'ریل چاکدار',size:''});
  assert.equal(c.technicalReview?.catalogPartCode,undefined);
 });
+
+
+test('enrichment preserves the complete source SKU multiset and only copies existing catalog markings',()=>{
+ const source=USER_PRODUCTS_RAW.flatMap(p=>p.variants||[]);
+ const result=USER_PRODUCTS.flatMap(p=>p.variants||[]);
+ const identity=(v:typeof source[number])=>JSON.stringify([v.code,v.name,v.size]);
+ assert.deepEqual(result.map(identity).sort(),source.map(identity).sort());
+ const normalize=(s:string)=>s.replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[\s\u200c]+/g,'').toUpperCase();
+ for(const v of result){
+   const marking=v.technicalReview?.catalogPartCode;
+   if(marking) assert.ok(normalize(v.name||'').includes(normalize(marking)),`Unrecorded marking for SKU ${v.code}`);
+ }
+});

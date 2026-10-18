@@ -33,3 +33,10 @@ Primary references checked:
 - https://committee.iso.org/cms/live/live/en/sites/isoorg/contents/data/standard/06/12/61232.html
 - https://www.ktr.com/us/en/products/rotex-torsionally-flexible-jaw-couplings/rotex-standard/
 - https://iskbearing.com/product-details/62200
+
+
+## کنترل مجدد کدهای اصلی
+
+تمام ۲۶۴۲ ردیف تازه استخراج‌شده دوباره با دادهٔ اصلی مقایسه شد. تعداد کدهای انبار قبل و بعد ۱۰۴۳۵ است؛ هیچ کد انباری اضافه یا تغییر نکرده است. آزمون حفظ کامل مجموعهٔ کد، نام و اندازهٔ اصلی نیز اجرا می‌شود. همهٔ مقادیر catalogPartCode از خود نام اصلی خوانده شده‌اند؛ این فیلد کد جدید یا تأیید هویت سازنده نیست. عنوان مبهم «کد اختصاصی» به «کد موجود در نام اصلی کالا» اصلاح شد.
+
+۴۰۵ تصویر همچنان فقط بررسی ظاهری دارند و به کد دقیق کالا متصل نشده‌اند؛ نام فایل‌های e(N).png شاهد تطبیق با SKU نیست.
