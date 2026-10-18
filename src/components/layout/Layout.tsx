@@ -15,6 +15,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     location.pathname === '/forza' ||
     location.pathname === '/face-to-face' ||
     location.pathname === '/ai-consult' ||
+    location.pathname === '/identify-part' ||
     location.pathname === '/ai-advisor' ||
     location.pathname === '/cognivo';
 

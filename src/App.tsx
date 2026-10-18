@@ -102,6 +102,7 @@ export default function App() {
                 >
                   <Routes>
                     {/* Dedicated AI Consult Cognivo Workspace Page */}
+                    <Route path="/identify-part" element={<AiConsultPage key="identify" identificationOnly />} />
                     <Route path="/ai-consult" element={<AiConsultPage />} />
                     <Route
                       path="/ai-advisor"

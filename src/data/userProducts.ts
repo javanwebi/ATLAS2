@@ -1,3 +1,4 @@
+import { groupProductFamilies } from './productFamilies';
 import type { Product } from '../types';
 import source from './catalogueSource.json';
 import imageReview from './catalogueImages.json';
@@ -34,7 +35,9 @@ export const USER_PRODUCTS_RAW: Product[] = source.map(family => {
 export function categorySlugFor(name: string): string {
   return name.trim().replace(/[\s\u200c]+/g, '-');
 }
-export const USER_PRODUCTS = USER_PRODUCTS_RAW;
+export const USER_PRODUCTS = groupProductFamilies(USER_PRODUCTS_RAW);
+const familyBySku = new Map(USER_PRODUCTS.flatMap(p => (p.variants || []).map(v => [v.code, p.code] as const)));
+export const PRODUCT_FAMILY_ALIASES = new Map(USER_PRODUCTS_RAW.map(raw => [raw.code.toLowerCase(), familyBySku.get(raw.variants?.[0]?.code || '') || raw.code]));
 export const USER_PRODUCTS_BY_CODE = new Map<string, Product>();
 export const USER_PRODUCTS_BY_CATEGORY = new Map<string, Product[]>();
 USER_PRODUCTS.forEach(product => {
@@ -44,6 +47,10 @@ USER_PRODUCTS.forEach(product => {
   categoryProducts.push(product);
   USER_PRODUCTS_BY_CATEGORY.set(product.categorySlug, categoryProducts);
 });
+for (const [alias, canonical] of PRODUCT_FAMILY_ALIASES) {
+  const product = USER_PRODUCTS_BY_CODE.get(canonical.toLowerCase());
+  if (product) USER_PRODUCTS_BY_CODE.set(alias, product);
+}
 export const CATALOGUE_SKU_COUNT = source.reduce((total, family) => total + family.itemCount, 0);
 export const normalizeCatalogueText = (value: string) => value.toLowerCase().replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\u200c/g, ' ').replace(/\s+/g, ' ').trim();
 const searchIndex = new Map(USER_PRODUCTS.map(product => [product.code, normalizeCatalogueText([

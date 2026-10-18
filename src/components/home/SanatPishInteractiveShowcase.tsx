@@ -220,6 +220,7 @@ export const SanatPishInteractiveShowcase: React.FC<SanatPishInteractiveShowcase
         { value: '< ۵ ثانیه', label: 'شناسایی هوشمند مشخصات قطعه' },
       ],
       ctaText: 'شروع شناسایی قطعه با هوش مصنوعی',
+      ctaLink: '/identify-part',
       ctaAction: 'visualSearch',
     },
     {

@@ -68,7 +68,7 @@ export function HomeAiIntroduction() {
             تصویر روشن و ابعاد را ارسال کنید؛ نتیجهٔ پیشنهادی را با کد و مشخصات
             واقعی محصول تطبیق دهید.
           </p>
-          <Link to="/ai-consult?view=visual" className="store-btn-secondary">
+          <Link to="/identify-part" className="store-btn-secondary">
             بررسی تصویر قطعه <ScanLine size={17} />
           </Link>
         </div>

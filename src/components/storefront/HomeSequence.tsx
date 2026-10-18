@@ -120,7 +120,7 @@ export function HomeForzaBanner() {
           <Link to="/ai-consult" className="store-btn-primary">
             ورود به میزکار FORZA <ArrowLeft size={17} />
           </Link>
-          <Link to="/ai-consult?view=visual" className="store-btn-secondary">
+          <Link to="/identify-part" className="store-btn-secondary">
             <ScanLine size={17} /> شناسایی با تصویر
           </Link>
         </div>

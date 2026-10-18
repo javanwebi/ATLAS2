@@ -1,3 +1,4 @@
+import { groupProductFamilies } from './productFamilies';
 import { publicCatalog } from "../utils/catalogPrivacy";
 import { Product, ProductGalleryImage, ProductVariant } from "../types";
 import {
@@ -8,6 +9,8 @@ import {
 import { BRANDS } from "./brands";
 import {
   USER_PRODUCTS,
+  USER_PRODUCTS_RAW,
+  PRODUCT_FAMILY_ALIASES,
   matchesProductSearch,
   normalizeCatalogueText,
 } from "./userProducts";
@@ -334,7 +337,7 @@ function ensureBrowserCatalogBuilt() {
   // 1. Add custom families created in Admin that are not in USER_PRODUCTS
   for (const [code, override] of Object.entries(overrides.families || {})) {
     if (deletedSet.has(code.toLowerCase())) continue;
-    const existsInBase = USER_PRODUCTS.some(
+    const existsInBase = USER_PRODUCTS_RAW.some(
       (p) => p.code.toLowerCase() === code.toLowerCase(),
     );
     if (!existsInBase) {
@@ -344,7 +347,7 @@ function ensureBrowserCatalogBuilt() {
   }
 
   // 2. Merge all 1,383 baseline families with any overrides
-  for (const base of USER_PRODUCTS) {
+  for (const base of USER_PRODUCTS_RAW) {
     if (deletedSet.has(base.code.toLowerCase())) continue;
     seenFamilyCodes.add(base.code.toLowerCase());
     const override =
@@ -359,8 +362,8 @@ function ensureBrowserCatalogBuilt() {
     }
   }
 
-  cachedAllIncludingInactive = allFamilies;
-  cachedProducts = allFamilies.filter((p) => p.active !== false);
+  cachedAllIncludingInactive = groupProductFamilies(allFamilies);
+  cachedProducts = cachedAllIncludingInactive.filter((p) => p.active !== false);
 
   cachedMapIncludingInactive = new Map();
   for (const p of cachedAllIncludingInactive) {
@@ -443,7 +446,7 @@ export async function saveManagedFamily(family: Product): Promise<Product> {
 }
 
 export async function deleteManagedFamily(code: string): Promise<void> {
-  const clean = code.trim();
+  const clean = PRODUCT_FAMILY_ALIASES.get(code.trim().toLowerCase()) || code.trim();
   const state = getOverridesState();
   delete state.families[clean];
   if (!state.deletedCodes.includes(clean)) {
@@ -468,7 +471,7 @@ export async function deleteManagedFamily(code: string): Promise<void> {
 }
 
 export async function resetManagedFamily(code: string): Promise<void> {
-  const clean = code.trim();
+  const clean = PRODUCT_FAMILY_ALIASES.get(code.trim().toLowerCase()) || code.trim();
   const state = getOverridesState();
   delete state.families[clean];
   state.deletedCodes = state.deletedCodes.filter(
@@ -547,7 +550,7 @@ export function getProductByCode(
   options?: { includeInactive?: boolean },
 ): Product | undefined {
   if (!code) return undefined;
-  const clean = code.trim();
+  const clean = PRODUCT_FAMILY_ALIASES.get(code.trim().toLowerCase()) || code.trim();
 
   if (typeof window === "undefined") {
     if (!cachedMap) {

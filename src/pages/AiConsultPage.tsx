@@ -169,14 +169,18 @@ const PROMPT_SUGGESTIONS = [
   },
 ];
 
-export const AiConsultPage: React.FC = () => {
+export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ identificationOnly = false }) => {
   const navigate = useNavigate();
   const {currentUser,openAuthModal}=useAuth();
   const [entryParams]=useSearchParams();
   const { addToCart } = useCart();
 
+  React.useEffect(() => {
+    if (!identificationOnly && entryParams.get('view') === 'visual') navigate('/identify-part?' + entryParams.toString(), { replace: true });
+  }, [identificationOnly, entryParams, navigate]);
+
   // Mode: Engineering Chat OR Visual Part Identification Studio
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'chat' | 'visual_studio'>(()=>entryParams.get('view')==='visual'?'visual_studio':'chat');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'chat' | 'visual_studio'>(()=>identificationOnly || entryParams.get('view')==='visual'?'visual_studio':'chat');
 
   // Chat sessions state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -301,7 +305,7 @@ export const AiConsultPage: React.FC = () => {
     } catch {}
     setMessages([]);
     setInputQuery('');
-    setActiveWorkspaceTab(!autoFocus&&entryParams.get('view')==='visual'?'visual_studio':'chat');
+    setActiveWorkspaceTab(identificationOnly || (!autoFocus && entryParams.get('view') === 'visual') ? 'visual_studio' : 'chat');
     setIsMobileDrawerOpen(false);
     if (autoFocus) {
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -991,16 +995,16 @@ export const AiConsultPage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* 1. DESKTOP SIDEBAR */}
-        <aside
+        <aside hidden={identificationOnly}
           className={`${
-            isSidebarOpen ? 'w-72 xl:w-80' : 'w-0 hidden'
+            !identificationOnly && isSidebarOpen ? 'w-72 xl:w-80' : 'w-0 hidden'
           } transition-all duration-300 ease-in-out hidden lg:flex flex-col shrink-0 overflow-hidden z-20`}
         >
           {renderSidebarContent()}
         </aside>
 
         {/* 2. MOBILE SLIDE-OVER DRAWER (RTL Natural Sheet) */}
-        {isMobileDrawerOpen && (
+        {!identificationOnly && isMobileDrawerOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex justify-start">
             <div
               className="fixed inset-0 bg-[#2B313A]/50 backdrop-blur-xs transition-opacity"
@@ -1015,7 +1019,7 @@ export const AiConsultPage: React.FC = () => {
         {/* 3. MAIN WORKSPACE CONTAINER */}
         <main className="flex-1 flex flex-col bg-[#F8F9FA] overflow-hidden min-w-0">
           {/* Top Header Bar */}
-          <header className="h-14 px-2.5 sm:px-5 border-b border-[#CBD2D8] flex items-center justify-between shrink-0 bg-[#FFFFFF] z-20 shadow-2xs">
+          {identificationOnly ? <header className="h-14 px-4 border-b border-[#CBD2D8] flex items-center justify-between bg-white shrink-0"><strong>شناسایی هوشمند قطعه</strong><button type="button" onClick={() => navigate('/ai-consult')} className="px-4 py-2 rounded-xl border border-[#CBD2D8] text-sm">بازگشت به میزکار</button></header> : <header className="h-14 px-2.5 sm:px-5 border-b border-[#CBD2D8] flex items-center justify-between shrink-0 bg-[#FFFFFF] z-20 shadow-2xs">
             <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
               {/* Mobile Drawer Button */}
               <button
@@ -1070,7 +1074,7 @@ export const AiConsultPage: React.FC = () => {
               <div className="hidden md:flex items-center gap-1 p-1 bg-[#F4F4F5] rounded-xl border border-[#CBD2D8] mr-2">
                 <button
                   type="button"
-                  onClick={() => setActiveWorkspaceTab('chat')}
+                  onClick={() => identificationOnly ? navigate('/ai-consult') : setActiveWorkspaceTab('chat')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                     activeWorkspaceTab === 'chat'
                       ? 'bg-[#FFFFFF] text-[#E06518] shadow-2xs border border-[#CBD2D8]'
@@ -1082,7 +1086,7 @@ export const AiConsultPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveWorkspaceTab('visual_studio')}
+                  onClick={() => navigate('/identify-part')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                     activeWorkspaceTab === 'visual_studio'
                       ? 'bg-[#FFFFFF] text-[#E06518] shadow-2xs border border-[#CBD2D8]'
@@ -1148,14 +1152,14 @@ export const AiConsultPage: React.FC = () => {
                 <Home className="w-4 h-4" />
               </button>
             </div>
-          </header>
+          </header>}
 
           {/* Mobile Dedicated Segmented Tabs Bar (Sticky right below top header) */}
-          <div className="md:hidden bg-[#FFFFFF] border-b border-[#CBD2D8] px-3 py-1.5 shrink-0 z-10 shadow-2xs">
+          <div hidden={identificationOnly} className="md:hidden bg-[#FFFFFF] border-b border-[#CBD2D8] px-3 py-1.5 shrink-0 z-10 shadow-2xs">
             <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#F4F4F5] rounded-xl border border-[#CBD2D8]">
               <button
                 type="button"
-                onClick={() => setActiveWorkspaceTab('chat')}
+                onClick={() => identificationOnly ? navigate('/ai-consult') : setActiveWorkspaceTab('chat')}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeWorkspaceTab === 'chat'
                     ? 'bg-[#FFFFFF] text-[#E06518] shadow-xs border border-[#CBD2D8]'
@@ -1172,7 +1176,7 @@ export const AiConsultPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveWorkspaceTab('visual_studio')}
+                onClick={() => navigate('/identify-part')}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeWorkspaceTab === 'visual_studio'
                     ? 'bg-[#FFFFFF] text-[#E06518] shadow-xs border border-[#CBD2D8]'
@@ -1196,7 +1200,7 @@ export const AiConsultPage: React.FC = () => {
           {/* ================================================================= */}
           {/* TAB 1: VISUAL PART IDENTIFICATION STUDIO                         */}
           {/* ================================================================= */}
-          {activeWorkspaceTab === 'visual_studio' ? (
+          {identificationOnly || activeWorkspaceTab === 'visual_studio' ? (
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full pb-20 md:pb-8">
               {/* Studio Header Banner */}
               <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#FFFFFF] border border-[#CBD2D8] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -1217,7 +1221,7 @@ export const AiConsultPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => setActiveWorkspaceTab('chat')}
+                  onClick={() => identificationOnly ? navigate('/ai-consult') : setActiveWorkspaceTab('chat')}
                   className="px-3 py-1.5 rounded-xl border border-[#CBD2D8] hover:border-[#E06518] text-[#55565A] hover:text-[#E06518] text-xs font-bold bg-[#FFFFFF] flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
@@ -1873,7 +1877,7 @@ export const AiConsultPage: React.FC = () => {
                       {/* Camera / Visual Part Switch */}
                       <button
                         type="button"
-                        onClick={() => setActiveWorkspaceTab('visual_studio')}
+                        onClick={() => navigate('/identify-part')}
                         className="p-2 rounded-xl text-[#777A7D] hover:text-[#E06518] hover:bg-[#DEE2E5] transition-colors cursor-pointer"
                         title="شناسایی قطعه با دوربین"
                       >

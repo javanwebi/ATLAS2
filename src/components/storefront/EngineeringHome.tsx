@@ -58,7 +58,7 @@ export function EngineeringHome() {
                 {t}
               </Link>
             ))}
-            <Link to="/ai-consult?view=visual">
+            <Link to="/identify-part">
               <ScanLine size={15} /> جستجو با عکس
             </Link>
           </div>
