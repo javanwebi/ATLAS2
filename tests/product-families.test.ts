@@ -22,3 +22,23 @@ test('technical and brand differences prevent accidental family merging', () => 
   assert.equal(groupProductFamilies([{...base, code:'a'}, {...base,code:'b',brand:'other'}]).length,2);
   assert.equal(groupProductFamilies([{...base, code:'a'}, {...base,code:'b',subcategory:'other'}]).length,2);
 });
+
+test('families cover chain pitches, ribbed belts, pulleys and roller parts across the catalog', () => {
+  const cases = [
+    ['FAM-70355', 'FAM-70359'],
+    ['FAM-70356', 'FAM-70358'],
+    ['FAM-34270', 'FAM-53001'],
+    ['FAM-39823', 'FAM-39229'],
+  ];
+  for (const [a,b] of cases) assert.equal(getProductByCode(a)?.code, getProductByCode(b)?.code, `${a} / ${b}`);
+  assert.notEqual(getProductByCode('FAM-70356')?.code, getProductByCode('FAM-10114')?.code, 'simplex and duplex chains stay separate');
+  assert.ok(USER_PRODUCTS.length < 1300, 'catalog-wide grouping must extend beyond bearings');
+});
+
+test('every historical family resolves to a family containing its exact original SKUs', () => {
+  for (const raw of USER_PRODUCTS_RAW) {
+    const family = getProductByCode(raw.code);
+    assert.ok(family, raw.code);
+    for (const variant of raw.variants || []) assert.ok(family.variants?.some(v => v.code === variant.code), `${raw.code} / ${variant.code}`);
+  }
+});

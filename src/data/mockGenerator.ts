@@ -348,7 +348,11 @@ function ensureBrowserCatalogBuilt() {
 
   // 2. Merge all 1,383 baseline families with any overrides
   for (const base of USER_PRODUCTS_RAW) {
-    if (deletedSet.has(base.code.toLowerCase())) continue;
+    const canonicalCode = PRODUCT_FAMILY_ALIASES.get(base.code.toLowerCase()) || base.code;
+    if (deletedSet.has(base.code.toLowerCase()) || deletedSet.has(canonicalCode.toLowerCase())) continue;
+    // A saved grouped family already contains its complete SKU list. Do not re-add
+    // former source families (including variants deliberately removed by Admin).
+    if (canonicalCode !== base.code && Object.values(overrides.families).some(f => f.code.toLowerCase() === canonicalCode.toLowerCase())) continue;
     seenFamilyCodes.add(base.code.toLowerCase());
     const override =
       overrides.families[base.code] ||
