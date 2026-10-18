@@ -2493,6 +2493,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                           <p>وضعیت: {technicalReview.status === 'reference-enriched' ? 'دارای اطلاعات مرجع پروفیل' : technicalReview.status === 'catalog-extracted' ? 'استخراج از شرح کاتالوگ' : 'نیازمند شناسایی مدل'}</p>
                           <p>اطلاعات مورد نیاز: {technicalReview.missing.join('، ')}</p>
                           {technicalReview.catalogPartCode&&<p>کد موجود در نام اصلی کالا: {technicalReview.catalogPartCode}؛ به معنی کد استاندارد نیست.</p>}
+                          {technicalReview.researchWarnings?.map(warning=><p key={warning} className="text-amber-800">نیازمند تطبیق: {warning}</p>)}
                           <p>بررسی تکمیلی: {technicalReview.requiredChecks?.join('، ')}</p>
                           {technicalReview.originalTechnicalType && technicalReview.originalTechnicalType !== technicalReview.categoryPath[2] && <p>نوع فنی اولیهٔ خانواده: {technicalReview.originalTechnicalType}؛ نوع دقیق این کد را پیش از تغییر کل خانواده بررسی کنید.</p>}
                           {technicalReview.comparisonReferences?.map(ref=><p key={ref.url}><a href={ref.url} target="_blank" rel="noopener noreferrer" className="underline text-[#E06518]">{ref.title}</a> — فقط مرجع مقایسه: {ref.condition}</p>)}

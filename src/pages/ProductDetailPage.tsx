@@ -1207,6 +1207,7 @@ export const ProductDetailPage: React.FC = () => {
                   <h3 className="font-bold text-[#55565A]">مسیر فنی و منابع این کد کالا</h3>
                   <p>{selectedVariant.technicalReview.categoryPath.join(' ← ')}</p>
                   <p className="leading-6">{selectedVariant.technicalReview.note}</p>
+                  {selectedVariant.technicalReview.researchWarnings?.map(warning=><p key={warning} className="leading-6 text-amber-800">نیازمند تطبیق: {warning}</p>)}
                   <div className="flex flex-wrap gap-3">
                     {selectedVariant.technicalReview.references.map(ref => <a key={ref.url} href={ref.url} target="_blank" rel="noopener noreferrer" className="text-[#E06518] underline underline-offset-4">{ref.title}</a>)}
                   </div>

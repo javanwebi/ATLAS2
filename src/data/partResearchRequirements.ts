@@ -24,5 +24,9 @@ export function partResearchRequirements(type:string,name:string):{checks:string
     checks.push('ROTEX یا ROTEX GS و اندازه دقیق کوپلینگ','جنس و سختی اسپایدر؛ از رنگ به تنهایی نتیجه گرفته نمی‌شود');
     comparisonReferences.push({title:'KTR — ROTEX reference',url:'https://www.ktr.com/us/en/products/rotex-torsionally-flexible-jaw-couplings/rotex-standard/',condition:'مرجع سازندهٔ ROTEX؛ درج نام در کاتالوگ به معنی اثبات سازنده یا اصالت قطعه نیست'});
   }
+  if(/جوشی/.test(name) && /ولتا|VOLTA/i.test(name)) {
+    checks.push('کد کامل سری Volta و نقشهٔ مقطع؛ A/B/C یا CRC به تنهایی سختی و ابعاد دقیق را تعیین نمی‌کند');
+    comparisonReferences.push({title:'Volta — V & Round Profiles, March 2026',url:'https://www.voltabelting.com/wp-content/uploads/VRound-Profiles-CAT503EN00-Ver.Q.March-2026.pdf',condition:'مرجع مقاطع و سری‌های سازنده؛ مشخصات یک سری را بدون کد کامل آن به تمام تسمه‌های هم‌رنگ یا هم‌حرف تعمیم ندهید'});
+  }
   return {checks,comparisonReferences};
 }

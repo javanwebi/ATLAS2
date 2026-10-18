@@ -40,3 +40,27 @@ Primary references checked:
 تمام ۲۶۴۲ ردیف تازه استخراج‌شده دوباره با دادهٔ اصلی مقایسه شد. تعداد کدهای انبار قبل و بعد ۱۰۴۳۵ است؛ هیچ کد انباری اضافه یا تغییر نکرده است. آزمون حفظ کامل مجموعهٔ کد، نام و اندازهٔ اصلی نیز اجرا می‌شود. همهٔ مقادیر catalogPartCode از خود نام اصلی خوانده شده‌اند؛ این فیلد کد جدید یا تأیید هویت سازنده نیست. عنوان مبهم «کد اختصاصی» به «کد موجود در نام اصلی کالا» اصلاح شد.
 
 ۴۰۵ تصویر همچنان فقط بررسی ظاهری دارند و به کد دقیق کالا متصل نشده‌اند؛ نام فایل‌های e(N).png شاهد تطبیق با SKU نیست.
+
+## Primary-table audit, 2026-10-19
+
+The fixed cohort in `src/data/technicalResearchCohort.json` contains exactly the same 2,642 existing warehouse identifiers discussed in the previous pass. `node --import tsx scripts/audit-research-cohort.ts --write` regenerates the row-by-row `docs/technical-research-2642.json` report.
+
+Results: **913** rows have a nominal length/profile listed in the checked primary tables; **1,139** retain an original drawing/catalog marking only; **590** still lack sufficient manufacturer identity (including 419 imperial designations not listed in these particular tables). A missing table entry does not prove a product is invalid or unavailable. **Zero** exact stocked-item identities are certified by this audit. This was full-cohort comparison with primary-source data, not 2,642 independent web searches or physical inspections.
+
+The 581-entry reference lookup is reproducibly extracted from the official Optibelt and Mitsuboshi manuals, retaining their download checksums and actual PDF page numbers. It is not a list of new inventory codes. Supplemental Mitsuboshi references apply only to the profiles explicitly listed, including double-sided construction only where the table states it.
+
+Corrections:
+- Historical rounded L/DL codes use the printed reference length: 187L / 187DL = 476.25 mm and 50 teeth. No direct multiplication of the rounded designation is used.
+- Unlisted lengths are withheld rather than calculated as though existence of that manufacturer model had been proved.
+- The checked Optibelt 817L row is internally inconsistent (printed length versus pitch × tooth count); it is retained as a conflict, not silently corrected.
+- MXL numerical conventions differ between the two manufacturers. An unspecified-brand MXL name no longer yields a presumed length. The Optibelt-specific convention is used only when Optibelt is explicitly named in the original description.
+- Wheels with O-ring coatings and cast housings holding diaphragms are classified by the actual leading part name. A mating part's polymer is no longer copied as the body's material.
+- ROTEX numbers absent from the current KTR Standard table are flagged, retaining the original number. No nearest-size substitution, hardness, torque or authenticity is inferred.
+- The Volta March 2026 profile brochure is provided as a conditional comparison for explicitly named Volta weldable belts; generic A/B/C/CRC labels do not establish a specific compound or rating.
+
+Current whole-catalog extraction totals: 2,523 reference-enriched; 5,512 catalog-extracted; 2,400 requiring identification. These are extraction states, not verified manufacturer identities.
+
+Additional primary sources inspected:
+- https://global.mitsuboshi.com/assetFiles/timing_belt_design_manual_en.pdf
+- https://www.voltabelting.com/wp-content/uploads/VRound-Profiles-CAT503EN00-Ver.Q.March-2026.pdf
+- https://www.ktr.com/us/en/products/rotex-torsionally-flexible-jaw-couplings/rotex-standard/
