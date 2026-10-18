@@ -1,3 +1,4 @@
+import { ProductImageAudit } from './ProductImageAudit';
 import { enrichTechnicalVariant } from '../../data/productTechnicalData';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -805,6 +806,17 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
 
   return (
     <div className="space-y-6 text-right" dir="rtl">
+      <ProductImageAudit products={products} onEdit={(code,file)=>{
+        const product=products.find(p=>p.code===code);if(!product)return;
+        handleOpenEditFamily(product,'images');
+        setDraftFamily(previous=>{
+          if(!previous)return previous;
+          const gallery=previous.galleryImages||[];
+          const url=getProductImageUrl(file);
+          if(gallery.some(image=>image.url===url))return previous;
+          return {...previous,galleryImages:[...gallery,{id:`review-${file}`,url,fileName:file,scope:'family',title:'تصویر در انتظار بررسی کد کالا',order:gallery.length+1}],images:[...(previous.images||[]),url]};
+        });
+      }} />
       {/* 1. HEADER & GLOBAL STATS */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -2042,7 +2054,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
           TWO-LEVEL FAMILY & SKU EDITOR MODAL
          ===================================================================== */}
       {isEditorOpen && draftFamily && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div role="dialog" aria-modal="true" aria-label="ویرایش خانواده محصول" className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-6xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
             {/* Modal Top Header */}
             <div className="px-5 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0">

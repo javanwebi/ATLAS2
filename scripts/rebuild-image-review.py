@@ -1,4 +1,4 @@
-import json, hashlib
+import json, hashlib, csv
 from pathlib import Path
 import sys
 root=Path(__file__).resolve().parents[1]
@@ -44,13 +44,13 @@ note('841-854','پولی/چرخ و قطعات انعطاف‌پذیر رنگی؛
 note('855-869','نمونه‌ها و رول‌های تسمه، نوار نقاله و مواد روکش؛ پروفیل، برند و ابعاد قابل تأیید نیست.')
 
 match(1160,'1','فنر فشاری مارپیچ فلزی با دورهای باز.')
-match(41,'5-8,40,41,54','پولی پلاستیکی شیاردار با سوراخ مرکزی؛ بدون نوشتهٔ مدل.')
+match(41,'5-8,40,41','پولی پلاستیکی شیاردار با سوراخ مرکزی؛ بدون نوشتهٔ مدل.')
 match(112,'14,15,75','پیچ با دستهٔ اهرمی مشکی و محور رزوه‌دار.')
 match(118,'16-27','پیچ فلکه‌ای مشکی با دستهٔ ستاره‌ای و محور رزوه‌دار.')
 match(1246,'30,123,125-127','تیغهٔ پلیمری تخت رنگی با لبهٔ مستقیم؛ نمونهٔ نوع تیغه، جنس آزمایش نشده.')
 match(127,'38,39,72,73','کوپلینگ اتصال دو محور با دو سر فلزی و بخش میانی انعطاف‌پذیر.')
 match(1125,'49,50,68-71,77','قطعات سفید/روشن ماشین‌کاری‌شدهٔ پلیمری؛ صرفاً نمونهٔ نوع قطعهٔ تفلونی، گرید جنس نامعلوم.')
-match(48,'51-53,55,176,177','چرخ‌دندهٔ پلاستیکی سفید با دندانه‌های پیرامونی واضح.')
+match(48,'51,53,55,176,177','چرخ‌دندهٔ پلاستیکی سفید با دندانه‌های پیرامونی واضح.')
 match(1237,'59-61,358,366,371,476,477','چرخ سفید پلیمری هرزگرد؛ بلبرینگ در سوراخ مرکزی به‌وضوح دیده می‌شود.')
 match(1236,'62-67,348,364,365,369,473','چرخ/پولی سفید پلیمری با محور مرکزی، بدون بلبرینگ قابل مشاهده.')
 match(1139,'74,80,117,118','بوش فلزی استوانه‌ای توخالی با سطح فلزی قابل مشاهده.')
@@ -115,6 +115,9 @@ note('741-745,748,749,754,755,759-766','اجزای استوانه‌ای/سور�
 note('855-857,867-869','چند تسمهٔ تایمینگ یا روکش‌دار در یک عکس؛ پروفیل T/AT/H، گام، سایز و برند خوانا نیست، پس به محصول مشخص وصل نشد.')
 note('858,861,865,866','نمونه‌های روکش، نوار یا مواد صنعتی؛ جنس/برند و نام دقیق محصول قابل تأیید نیست.')
 
+note('54','قطعهٔ پلیمری تخت مستطیلی با شیار؛ شکل پولی ندارد و اتصال قبلی به پولی رد شد.')
+note('52','چرخ‌دندهٔ خاکستری با دندانه پیرامونی؛ تطبیق با خانوادهٔ چرخ‌دندهٔ پلاستیکی سفید تأیید نشده است.')
+
 # A second independent check of asset existence and a checksum per image makes
 # the audit reproducible if the external image repository changes.
 for n,item in audit.items():
@@ -127,6 +130,9 @@ for item in audit.values():
  f=matches.setdefault(item['familyCode'],{'familyName':item['familyName'],'scope':'family-example','files':[]})
  f['files'].append(item['file'])
 (root/'src/data/catalogueImages.json').write_text(json.dumps(matches,ensure_ascii=False,indent=2)+'\n')
-out={'reviewDate':'2026-10-17','assetRepository':'javanweb/imagesatlas','totalAssets':869,'originalRequestedAssets':864,'method':'Visual inspection of all indexed assets; expanded views for ambiguous examples. No inference from old names or sequential image IDs. Product-type matching only; exact SKU dimensions and brands remain unverified.','matchedImages':sum(i['familyCode'] is not None for i in audit.values()),'matchedFamilies':len(matches),'items':list(audit.values())}
+out={'reviewDate':'2026-10-19','assetRepository':'javanweb/imagesatlas','totalAssets':869,'originalRequestedAssets':864,'method':'Visual inspection of all indexed assets; expanded views for ambiguous examples. No inference from old names or sequential image IDs. Product-type matching only; exact SKU dimensions and brands remain unverified.','matchedImages':sum(i['familyCode'] is not None for i in audit.values()),'matchedFamilies':len(matches),'items':list(audit.values())}
 (root/'docs/product-image-review.json').write_text(json.dumps(out,ensure_ascii=False,indent=2)+'\n')
+with (root/'docs/product-image-review.csv').open('w',encoding='utf-8-sig',newline='') as f:
+ writer=csv.DictWriter(f,fieldnames=['file','status','observed','familyCode','familyName','sourceRow','reason','sha256','skuVerified'],extrasaction='ignore',lineterminator='\n')
+ writer.writeheader();writer.writerows(audit.values())
 print({k:out[k] for k in ['totalAssets','matchedImages','matchedFamilies']})

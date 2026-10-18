@@ -1,10 +1,10 @@
 {
-  "reviewDate": "2026-10-17",
+  "reviewDate": "2026-10-19",
   "assetRepository": "javanweb/imagesatlas",
   "totalAssets": 869,
   "originalRequestedAssets": 864,
   "method": "Visual inspection of all indexed assets; expanded views for ambiguous examples. No inference from old names or sequential image IDs. Product-type matching only; exact SKU dimensions and brands remain unverified.",
-  "matchedImages": 466,
+  "matchedImages": 464,
   "matchedFamilies": 53,
   "items": [
     {
@@ -546,12 +546,11 @@
     },
     {
       "file": "e(52).png",
-      "status": "matched-product-type",
-      "observed": "چرخ‌دندهٔ پلاستیکی سفید با دندانه‌های پیرامونی واضح.",
-      "familyCode": "FAM-80301",
-      "sourceRow": 48,
-      "reason": "تطبیق نام نوع محصول و ویژگی‌های قابل مشاهده؛ سایز، برند، جنس دقیق و کد مدل از تصویر تأیید نشده‌اند.",
-      "familyName": "چرخ دنده پلاستیکی سفید",
+      "status": "needs-identification",
+      "observed": "چرخ‌دندهٔ خاکستری با دندانه پیرامونی؛ تطبیق با خانوادهٔ چرخ‌دندهٔ پلاستیکی سفید تأیید نشده است.",
+      "familyCode": null,
+      "sourceRow": null,
+      "reason": "برای انتساب دقیق، کد کاتالوگ یا تأیید صاحب کالا لازم است؛ منتشر نشده.",
       "sha256": "a9e0fe3a73d2ce5e3ffe7f97f0264df445d91843ac01398a59df38695526b358",
       "skuVerified": false
     },
@@ -568,12 +567,11 @@
     },
     {
       "file": "e(54).png",
-      "status": "matched-product-type",
-      "observed": "پولی پلاستیکی شیاردار با سوراخ مرکزی؛ بدون نوشتهٔ مدل.",
-      "familyCode": "FAM-41625",
-      "sourceRow": 41,
-      "reason": "تطبیق نام نوع محصول و ویژگی‌های قابل مشاهده؛ سایز، برند، جنس دقیق و کد مدل از تصویر تأیید نشده‌اند.",
-      "familyName": "پولی پلاستیکی",
+      "status": "needs-identification",
+      "observed": "قطعهٔ پلیمری تخت مستطیلی با شیار؛ شکل پولی ندارد و اتصال قبلی به پولی رد شد.",
+      "familyCode": null,
+      "sourceRow": null,
+      "reason": "برای انتساب دقیق، کد کاتالوگ یا تأیید صاحب کالا لازم است؛ منتشر نشده.",
       "sha256": "5a305fad04d69ab49fe329e036703557fa67b1af1629bb8f54a865470cda91d3",
       "skuVerified": false
     },

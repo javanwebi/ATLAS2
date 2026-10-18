@@ -441,11 +441,11 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
   const handleSelectPresetSample = (sample: IndustrialPresetSample) => {
     setCapturedImage(sample.imageUrl);
     stopCamera();
-    if (sample.length) setDimensionLength(sample.length.toString());
-    if (sample.width) setDimensionWidth(sample.width.toString());
-    if (sample.pitch) setDimensionPitch(sample.pitch.toString());
-    if (sample.application) setPartApplication(sample.application);
-    if (sample.features) setPartMarking(sample.features);
+    setDimensionLength(sample.length ? sample.length.toString() : "");
+    setDimensionWidth(sample.width ? sample.width.toString() : "");
+    setDimensionPitch(sample.pitch ? sample.pitch.toString() : "");
+    setPartApplication(sample.application);
+    setPartMarking(sample.features);
   };
 
   const runAiPartAnalysis = async () => {

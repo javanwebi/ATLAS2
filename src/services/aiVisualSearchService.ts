@@ -96,61 +96,8 @@ export interface AiPartAnalysisResult {
 }
 
 // Sample industrial presets for one-click testing (real catalog products)
-export interface IndustrialPresetSample {
-  id: string;
-  title: string;
-  subtitle: string;
-  imageUrl: string;
-  length: number;
-  width: number;
-  pitch?: number;
-  application: string;
-  features: string;
-}
-
-export const INDUSTRIAL_PRESET_SAMPLES: IndustrialPresetSample[] = [
-  {
-    id: 'sample-timing-htd',
-    title: 'تسمه تایمینگ صنعتی گام 8M',
-    subtitle: 'مدل 376 با ۴۷ دندانه — SWR',
-    imageUrl: getProductImageUrl('e(552).png'),
-    length: 376,
-    width: 30,
-    pitch: 8,
-    application: 'خط انتقال و پرس کاشی و سرامیک',
-    features: 'دندانه گرد HTD، بدون لغزش، مقاوم به کشش بالا',
-  },
-  {
-    id: 'sample-vbelt-forza',
-    title: 'تسمه V-Belt مقطع B فورزا',
-    subtitle: 'تقویت‌شده گرید سنگین — FORZA',
-    imageUrl: getProductImageUrl('e(541).png'),
-    length: 1250,
-    width: 17,
-    application: 'الکتروموتور فن مکنده کوره و پمپ آب صنعتی',
-    features: 'تحمل حرارت خط تولید تا ۸۰ درجه، مقاومت به گریس و روغن',
-  },
-  {
-    id: 'sample-pu-wheel',
-    title: 'چرخ روکش پلی‌یورتان هدایت کاشی',
-    subtitle: 'روکش PU آلمانی Shore 85A',
-    imageUrl: getProductImageUrl('e(319).png'),
-    length: 120,
-    width: 45,
-    application: 'خط هدایت و انتقال کاشی بدون سایش سطح',
-    features: 'مقاومت سایشی ۴ برابر لاستیک معمولی، مغزی آلومینیوم با بلبرینگ',
-  },
-  {
-    id: 'sample-coupling-bushing',
-    title: 'بوش لاستیکی کوپلینگ خاری',
-    subtitle: 'کد 1000 0 1 — FORZA',
-    imageUrl: getProductImageUrl('e(001).png'),
-    length: 60,
-    width: 45,
-    application: 'اتصال شفت پمپ‌ها و گیربکس‌های صنعتی',
-    features: 'جذب ارتعاش و ضربه، مقاوم به سایش و روغن، استاندارد DIN 2215',
-  },
-];
+export { INDUSTRIAL_PRESET_SAMPLES } from '../data/recognitionSamples';
+export type { IndustrialPresetSample } from '../data/recognitionSamples';
 
 function dataUrlToBlob(value: string, fallbackMime = 'image/jpeg'): Blob {
   const match = value.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);

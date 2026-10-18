@@ -255,8 +255,8 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
     setMimeType("image/jpeg");
     setErrorMessage("");
     uploadSelectedImage(preset.imageUrl);
-    setLength(preset.length.toString());
-    setWidth(preset.width.toString());
+    setLength(preset.length ? preset.length.toString() : "");
+    setWidth(preset.width ? preset.width.toString() : "");
     if (preset.pitch) setPitch(preset.pitch.toString());
     else setPitch("");
     setApplication(preset.application);
