@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Link } from "react-router-dom";
+import { PartIdentificationLink as Link } from "../search/PartIdentificationProvider";
 import {
   ArrowLeft,
   ArrowUpLeft,

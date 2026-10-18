@@ -1,3 +1,4 @@
+import { PartIdentificationProvider, PartIdentificationPage } from './components/search/PartIdentificationProvider';
 import {
   IndustryPage,
   IndustriesPage,
@@ -89,7 +90,7 @@ export default function App() {
         <CartProvider>
           <WishlistProvider>
             <ClubPointsProvider>
-              <Layout>
+              <PartIdentificationProvider><Layout>
                 <Suspense
                   fallback={
                     <div
@@ -102,7 +103,7 @@ export default function App() {
                 >
                   <Routes>
                     {/* Dedicated AI Consult Cognivo Workspace Page */}
-                    <Route path="/identify-part" element={<AiConsultPage key="identify" identificationOnly />} />
+                    <Route path="/identify-part" element={<PartIdentificationPage />} />
                     <Route path="/ai-consult" element={<AiConsultPage />} />
                     <Route
                       path="/ai-advisor"
@@ -313,7 +314,7 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </Suspense>
-              </Layout>
+              </Layout></PartIdentificationProvider>
             </ClubPointsProvider>
           </WishlistProvider>
         </CartProvider>

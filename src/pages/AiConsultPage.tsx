@@ -176,7 +176,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
   const { addToCart } = useCart();
 
   React.useEffect(() => {
-    if (!identificationOnly && entryParams.get('view') === 'visual') navigate('/identify-part?' + entryParams.toString(), { replace: true });
+    if (!identificationOnly && entryParams.get('view') === 'visual') navigate('/identify-part?from=workspace&' + entryParams.toString(), { replace: true });
   }, [identificationOnly, entryParams, navigate]);
 
   // Mode: Engineering Chat OR Visual Part Identification Studio
@@ -1086,7 +1086,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/identify-part')}
+                  onClick={() => navigate('/identify-part?from=workspace')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                     activeWorkspaceTab === 'visual_studio'
                       ? 'bg-[#FFFFFF] text-[#E06518] shadow-2xs border border-[#CBD2D8]'
@@ -1176,7 +1176,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/identify-part')}
+                onClick={() => navigate('/identify-part?from=workspace')}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeWorkspaceTab === 'visual_studio'
                     ? 'bg-[#FFFFFF] text-[#E06518] shadow-xs border border-[#CBD2D8]'
@@ -1877,7 +1877,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
                       {/* Camera / Visual Part Switch */}
                       <button
                         type="button"
-                        onClick={() => navigate('/identify-part')}
+                        onClick={() => navigate('/identify-part?from=workspace')}
                         className="p-2 rounded-xl text-[#777A7D] hover:text-[#E06518] hover:bg-[#DEE2E5] transition-colors cursor-pointer"
                         title="شناسایی قطعه با دوربین"
                       >

@@ -10,6 +10,9 @@ export interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | string;
   noPadding?: boolean;
   mobileBottomSheet?: boolean;
+  fullScreen?: boolean;
+  closeLabel?: string;
+  dialogLabel?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -21,6 +24,9 @@ export const Modal: React.FC<ModalProps> = ({
   size,
   noPadding = false,
   mobileBottomSheet = true,
+  fullScreen = false,
+  closeLabel = "بستن پنجره",
+  dialogLabel = "پنجره",
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,21 +57,23 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div
       className={`fixed inset-0 z-50 flex ${
-        mobileBottomSheet
+        fullScreen ? "items-stretch justify-center p-0" : mobileBottomSheet
           ? 'items-end md:items-center justify-center p-0 md:p-4'
           : 'items-center justify-center p-3 sm:p-4'
       }`}
     >
       {/* Backdrop */}
-      <div
+      {!fullScreen && <div
         className="fixed inset-0 bg-[#16191f]/75 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
-      />
+      />}
 
       {/* Modal / Bottom Sheet Container */}
       <div
-        className={`relative w-full ${maxWidthMap[maxWidth] || 'max-w-lg'} bg-white ${
-          mobileBottomSheet
+        role="dialog" aria-modal="true" aria-label={title || dialogLabel} dir="rtl"
+        data-fullscreen={fullScreen}
+        className={`relative w-full ${fullScreen ? "max-w-none h-[100dvh]" : maxWidthMap[maxWidth] || 'max-w-lg'} bg-white ${
+          fullScreen ? "rounded-none" : mobileBottomSheet
             ? 'rounded-t-[28px] md:rounded-3xl max-h-[92vh] md:max-h-[90vh]'
             : 'rounded-3xl max-h-[90vh]'
         } shadow-2xl border-t md:border border-slate-200/80 overflow-hidden z-10 animate-in fade-in slide-in-from-bottom-6 md:zoom-in-95 duration-200`}
@@ -76,13 +84,13 @@ export const Modal: React.FC<ModalProps> = ({
             <button
               onClick={onClose}
               className="text-[#777A7D] hover:text-[#55565A] p-1.5 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
-              aria-label="بستن پنجره"
+              aria-label={closeLabel}
             >
-              <X className="w-5 h-5" />
+              {fullScreen ? <span className="text-xs font-bold">{closeLabel}</span> : <X className="w-5 h-5" />}
             </button>
           </div>
         )}
-        <div className={`${noPadding ? 'p-0' : 'p-5 sm:p-6'} overflow-y-auto max-h-[92vh] md:max-h-[88vh] scrollbar-thin`}>
+        <div className={`${noPadding ? 'p-0' : 'p-5 sm:p-6'} overflow-y-auto ${fullScreen ? (title ? 'h-[calc(100dvh-72px)]' : 'h-[100dvh]') : 'max-h-[92vh] md:max-h-[88vh]'} scrollbar-thin`}>
           {children}
         </div>
       </div>
