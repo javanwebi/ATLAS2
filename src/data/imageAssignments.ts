@@ -1,3 +1,4 @@
+import imageResearch from './imageResearch.json';
 import review from '../../docs/product-image-review.json';
 import type { Product } from '../types';
 
@@ -35,10 +36,12 @@ export function getImageAssignmentAudit(products: Product[]) {
   }
   const duplicates=new Map<string,string[]>();
   for(const item of review.items){const files=duplicates.get(item.sha256)||[];files.push(item.file);duplicates.set(item.sha256,files);}
+  const researchByFile=new Map(imageResearch.items.map(item=>[item.file,item]));
   return review.items.map(item=>{
     const linked=(bindings.get(item.file)||[]).map(x=>({...x,codes:[...new Set(x.codes)]}));
     const codeCount=linked.reduce((n,x)=>n+x.codes.length,0);
     return {file:item.file,observed:item.observed,reason:item.reason,sha256:item.sha256,
+      research:researchByFile.get(item.file),
       status:codeCount ? 'sku-linked' as const : linked.length ? 'family-example' as const : 'unassigned' as const,
       families:linked.map(({family,codes})=>({code:family.code,name:family.name,category:family.categoryName,
         skus:codes.map(code=>family.variants!.find(v=>v.code===code)!),candidateSkuCount:family.variants?.length||0})),

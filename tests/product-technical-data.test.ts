@@ -41,3 +41,49 @@ test('manual values win and unitless source dimensions stay unitless',()=>{
   assert.equal(spec(v,'قطر درج‌شده'),'40 (واحد در منبع مشخص نیست)');
   assert.equal(v.technicalReview?.evidence.find(e=>e.key==='ارتفاع اسمی پروفیل (مرجع)')?.basis,'admin');
 });
+
+test('imperial H belts decode verified designation conventions, not millimeter lengths',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'warehouse',name:'تسمه 1000H100',size:''});
+ assert.equal(v.model,'H');
+ assert.equal(spec(v,'طول گام از نام‌گذاری اینچی (مرجع)'),'2540 میلی‌متر');
+ assert.equal(spec(v,'عرض از کد سه‌رقمی اینچی (مرجع)'),'25.4 میلی‌متر');
+ assert.equal(spec(v,'تعداد دندانه از نام‌گذاری (مرجع)'),'200');
+ assert.ok(v.technicalReview?.references.some(r=>r.title.includes('19347')));
+});
+test('rounded historical length codes do not produce fractional tooth counts',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'warehouse',name:'تسمه 187DL100',size:''});
+ assert.ok(spec(v,'ابهام نام‌گذاری طول'));
+ assert.equal(spec(v,'طول گام از نام‌گذاری اینچی (مرجع)'),undefined);
+});
+test('explicit drawing codes are preserved without inventing a standard or manufacturer model',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'44624',name:'بوش داخل بلبرینگ پولی هرزگرد کد1302/1',size:'1302/1'});
+ assert.equal(v.technicalReview?.catalogPartCode,'1302/1');
+ assert.equal(v.technicalReview?.standardStatus,'not-established');
+ assert.equal(spec(v,'نوع قطعه'),'بوش صنعتی');
+ assert.equal(v.model,undefined);
+});
+test('a pulley located in a belt category is not decoded as a timing belt',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'x',name:'پولی 20H100',size:'20H100'});
+ assert.equal(spec(v,'نوع قطعه'),'پولی صنعتی');
+ assert.equal(spec(v,'طول گام از نام‌گذاری اینچی (مرجع)'),undefined);
+});
+test('washing and seal standards are conditional references rather than claimed conformity',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'x',name:'واشر پلی یورتان 3 * 48 * 100',size:''});
+ assert.equal(v.technicalReview?.standardStatus,'not-established');
+ assert.ok(v.technicalReview?.comparisonReferences?.every(r=>r.condition.includes('فقط')));
+});
+test('technical extraction is idempotent and manual overrides survive reprocessing',()=>{
+ const v=enrichTechnicalVariant(belt,{code:'x',name:'تسمه1000H100',size:''});
+ assert.deepEqual(enrichTechnicalVariant(belt,v),v);
+ const changed={...v,technicalSpecs:v.technicalSpecs!.map(s=>s.key==='نوع قطعه'?{...s,value:'تأیید مدیر'}:s)};
+ assert.equal(spec(enrichTechnicalVariant(belt,changed),'نوع قطعه'),'تأیید مدیر');
+});
+
+test('catalog markings preserve letter suffixes and Persian drawing prefixes',()=>{
+ const a=enrichTechnicalVariant(belt,{code:'x',name:'بوش کد1302/1A',size:''});
+ assert.equal(a.technicalReview?.catalogPartCode,'1302/1A');
+ const b=enrichTechnicalVariant(belt,{code:'y',name:'بوش کد ت/ 1162/2',size:''});
+ assert.equal(b.technicalReview?.catalogPartCode,'ت/1162/2');
+ const c=enrichTechnicalVariant(belt,{code:'z',name:'ریل چاکدار',size:''});
+ assert.equal(c.technicalReview?.catalogPartCode,undefined);
+});

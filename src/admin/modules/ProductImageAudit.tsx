@@ -10,7 +10,7 @@ export function ProductImageAudit({products,onEdit}:{products:Product[];onEdit:(
   const [query,setQuery]=useState('');const [status,setStatus]=useState('all');const [page,setPage]=useState(0);
   const [selected,setSelected]=useState<string|null>(null);const [familyQuery,setFamilyQuery]=useState('');
   const audit=useMemo(()=>getImageAssignmentAudit(products),[products]);
-  const filtered=useMemo(()=>audit.filter(row=>(status==='all'||row.status===status)&&normalizeCatalogueText([row.file,row.observed,...row.families.flatMap(f=>[f.code,f.name,...f.skus.flatMap(v=>[v.code,v.name])])].join(' ')).includes(normalizeCatalogueText(query))),[audit,query,status]);
+  const filtered=useMemo(()=>audit.filter(row=>(status==='all'||row.status===status)&&normalizeCatalogueText([row.file,row.observed,row.research?.visualType,row.research?.visibleFeatures,...row.families.flatMap(f=>[f.code,f.name,...f.skus.flatMap(v=>[v.code,v.name])])].join(' ')).includes(normalizeCatalogueText(query))),[audit,query,status]);
   const pageCount=Math.max(1,Math.ceil(filtered.length/24));const activePage=Math.min(page,pageCount-1);
   const families=products.filter(p=>normalizeCatalogueText(p.code+' '+p.name+' '+(p.variants||[]).map(v=>v.code+' '+v.name).join(' ')).includes(normalizeCatalogueText(familyQuery))).slice(0,30);
   const download=()=>{
@@ -26,7 +26,7 @@ export function ProductImageAudit({products,onEdit}:{products:Product[];onEdit:(
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">{filtered.slice(activePage*24,activePage*24+24).map(row=><article key={row.file} className="rounded-xl border border-slate-200 p-3 space-y-2 text-xs">
       <ProductImage src={getProductImageUrl(row.file)} alt={row.observed} className="h-32 w-full object-contain" />
-      <strong dir="ltr">{row.file}</strong><p className="leading-5 text-slate-600">{row.observed}</p>
+      <strong dir="ltr">{row.file}</strong>{row.research && <div className="rounded-lg border border-orange-100 bg-orange-50/30 p-2 space-y-2"><strong>{row.research.visualType}</strong><p className="leading-5">{row.research.visibleFeatures}</p><p className="leading-5">برای تعیین مدل: {row.research.requiredChecks.join('، ')}</p><p>استاندارد و کد دقیق هنوز تأیید نشده‌اند.</p></div>}<p className="leading-5 text-slate-600">{row.observed}</p>
       {row.families.map(f=><div key={f.code} className="rounded-lg bg-slate-50 p-2 leading-6"><p>خانواده: {f.name} ({f.code})</p><p>{f.category}</p>{f.skus.length ? f.skus.map(v=><p key={v.code}>کد متصل‌شده: {v.code} — {v.name}</p>) : <p>نمونهٔ خانواده؛ {f.candidateSkuCount.toLocaleString('fa-IR')} کد احتمالی، بدون کد تأییدشده</p>}</div>)}
       {!row.families.length&&<p className="text-amber-700">خانواده و کد هنوز تأیید نشده است</p>}
       {!!row.duplicateFiles.length&&<p>فایل تکراریِ یکسان: {row.duplicateFiles.join('، ')}</p>}

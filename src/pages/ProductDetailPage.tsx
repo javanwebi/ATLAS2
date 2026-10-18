@@ -1210,6 +1210,7 @@ export const ProductDetailPage: React.FC = () => {
                   <div className="flex flex-wrap gap-3">
                     {selectedVariant.technicalReview.references.map(ref => <a key={ref.url} href={ref.url} target="_blank" rel="noopener noreferrer" className="text-[#E06518] underline underline-offset-4">{ref.title}</a>)}
                   </div>
+                  {selectedVariant.technicalReview.comparisonReferences?.map(ref=><p key={ref.url} className="leading-6"><a href={ref.url} target="_blank" rel="noopener noreferrer" className="text-[#E06518] underline">{ref.title}</a> — مرجع مقایسه: {ref.condition}</p>)}
                   <p className="leading-6">نیازمند تکمیل: {selectedVariant.technicalReview.missing.join('، ')}</p>
                 </section>
               )}

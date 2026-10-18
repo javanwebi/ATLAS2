@@ -33,3 +33,9 @@ test('recognition examples never populate fabricated technical dimensions',()=>{
  for(const sample of INDUSTRIAL_PRESET_SAMPLES){assert.equal(sample.length,0);assert.equal(sample.width,0);assert.equal(sample.features,'');}
  assert.equal(INDUSTRIAL_PRESET_SAMPLES.find(x=>x.imageUrl.includes('319'))?.title,'ریل صنعتی');
 });
+
+test('all unresolved images have detailed visual research without fabricated SKU or standard',()=>{
+ const audit=getImageAssignmentAudit(USER_PRODUCTS).filter(row=>row.status==='unassigned');
+ assert.equal(audit.length,405);
+ for(const row of audit){assert.ok(row.research);assert.equal(row.research.sourceSha256,row.sha256);assert.equal(row.research.exactSku,null);assert.equal(row.research.standardStatus,'not-established');assert.ok(row.research.requiredChecks.length>=3);}
+});
