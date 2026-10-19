@@ -1,10 +1,12 @@
 import reference from './imperialTimingReference.json';
+import misumi from './misumiTimingReference.json';
 
 export interface DesignationCheck {
   status: 'listed-reference-length' | 'unlisted-reference-length' | 'reference-conflict';
   designation: string;
   sourceUrl: string;
   pdfPage?: number;
+  sourcePage?: number;
   lengthMm?: number;
   teeth?: number;
   identityVerified: false;
@@ -20,5 +22,7 @@ export function checkImperialDesignation(number: string, profile: string): Desig
   const row = rows[designation];
   if (row) return {status:'listed-reference-length',designation,sourceUrl:reference.sourceUrl,...row,identityVerified:false};
   if (conflicts[designation]) return {status:'reference-conflict',designation,sourceUrl:reference.sourceUrl,pdfPage:conflicts[designation].pdfPage,identityVerified:false};
+  const supplemental:Record<string,{lengthMm:number;teeth:number;sourceUrl:string;sourcePage:number}>=misumi.lengths;
+  if(supplemental[designation])return {status:'listed-reference-length',designation,...supplemental[designation],identityVerified:false};
   return {status:'unlisted-reference-length',designation,sourceUrl:reference.sourceUrl,identityVerified:false};
 }

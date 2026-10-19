@@ -2,7 +2,7 @@
 
 All 10,435 original SKUs are processed individually by productTechnicalData.ts. Original names, sizes, warehouse codes, financial fields and image bindings are preserved.
 
-Coverage: 2,465 SKUs with matching profile-reference enrichment; 5,512 with a readable model/designation or explicitly labelled catalog part code; 2,458 requiring model identification. None of these counts certifies the actual manufacturer's product.
+Current coverage after the owner-catalogue pass: 2,523 SKUs with reference enrichment; 5,512 with a readable model/designation or explicitly labelled catalog part code; 2,400 requiring model identification. None of these counts certifies the actual manufacturer's product.
 
 Classification paths include category, subgroup, technical type and model where readable. Narrow V belts, classical V belts, ribbed belts, timing belts, bearing bore codes and B-series chain pitches use separate rules. Other parts retain explicit material/color/construction/dimension descriptions. Unitless dimensions remain unitless.
 
@@ -64,3 +64,20 @@ Additional primary sources inspected:
 - https://global.mitsuboshi.com/assetFiles/timing_belt_design_manual_en.pdf
 - https://www.voltabelting.com/wp-content/uploads/VRound-Profiles-CAT503EN00-Ver.Q.March-2026.pdf
 - https://www.ktr.com/us/en/products/rotex-torsionally-flexible-jaw-couplings/rotex-standard/
+
+
+## Owner catalogue reconciliation, 2026-10-19
+
+The supplied 107-page illustrated Atlas catalogue (SHA-256 `2064bb6a4763c0e41f41bd4adc005bcf8f43591174a8e71850cab15741720a3a`) was inspected page by page. Eight existing family classifications were corrected; original warehouse identifiers, SKU names and sizes remain unchanged.
+
+The pin drawing on PDF page 105 and dimension table on PDF page 106 (printed page 88) provide exact existing-code evidence for 31 rows in the fixed research cohort. Symbols 2R/W/h/2r and millimetre units are retained without inventing geometric interpretations. Duplicate code 90155 has conflicting 2r values (13/14 mm), so its dimensions are withheld. Catalogue code 90148 does not exist in the imported inventory and was not created.
+
+143 of the 405 unresolved photographs match the same photograph and group heading in the supplied catalogue. These are searchable in the admin image audit. This verifies the catalogue group, not the warehouse SKU, model or size. No guessed photo-to-SKU bindings were added.
+
+Additional official MISUMI H-profile tables support nominal reference lengths for 217 more cohort rows. The current 2,642-row report contains 1,130 nominal-length reference matches, 31 owner-table dimension matches, one owner-table conflict, 1,107 original-marking-only rows and 373 incomplete manufacturer identities. Exact manufacturer identities verified: zero. These remaining cases require a legible marking, manufacturer drawing or an inventory-to-catalogue crosswalk; they are not presented as completed identifications.
+
+Source pages for the additional reference table:
+- https://th.c.misumi-ec.com/book/THA_EconomySeries_e-catalog2023_2nd/files/basic-html/page604.html
+- https://th.c.misumi-ec.com/book/THA_EconomySeries_e-catalog2023_2nd/files/basic-html/page605.html
+
+Earlier counts above describe historical passes, not current completion claims.

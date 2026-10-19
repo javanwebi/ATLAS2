@@ -1,7 +1,6 @@
 import { BELT_MENU, matchesBeltSelection } from "./beltNavigation";
 import type { Category, Product } from '../types';
-import { USER_PRODUCTS, categorySlugFor } from './userProducts';
-import source from './catalogueSource.json';
+import { USER_PRODUCTS, USER_PRODUCTS_RAW, categorySlugFor } from './userProducts';
 
 export interface CategoryNode { name: string; children?: CategoryNode[]; }
 export interface EnhancedCategory extends Category {
@@ -9,16 +8,17 @@ export interface EnhancedCategory extends Category {
 }
 // Only columns A, B and C belong in navigation. Family names and SKU names never enter this tree.
 const definitions: EnhancedCategory[] = [];
-for (const family of source) {
+for (const family of USER_PRODUCTS_RAW) {
   let category = definitions.find(c => c.name === family.categoryName);
   if (!category) {
     category = { id: definitions.length + 1, name: family.categoryName, slug: categorySlugFor(family.categoryName),
       nameEn: '', icon: 'Package', description: '', children: [], subcategories: [], count: 0 };
     definitions.push(category);
   }
-  let submenu = category.children.find(n => n.name === family.submenu);
-  if (!submenu) { submenu = { name: family.submenu, children: [] }; category.children.push(submenu); }
-  if (!submenu.children!.some(n => n.name === family.technicalType)) submenu.children!.push({ name: family.technicalType });
+  const submenuName=family.submenu||family.subcategory;
+  let submenu = category.children.find(n => n.name === submenuName);
+  if (!submenu) { submenu = { name: submenuName, children: [] }; category.children.push(submenu); }
+  if (!submenu.children!.some(n => n.name === family.subcategory)) submenu.children!.push({ name: family.subcategory });
 }
 export function flattenCategoryNodes(nodes: CategoryNode[]): CategoryNode[] {
   return nodes.flatMap(node => [node, ...flattenCategoryNodes(node.children || [])]);

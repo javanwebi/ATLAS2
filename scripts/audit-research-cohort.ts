@@ -14,8 +14,9 @@ const records=USER_PRODUCTS.flatMap(p=>(p.variants||[]).filter(v=>skus.has(v.cod
   originalIdentityPreserved:v.code===source.code&&v.name===source.name&&v.size===source.size,
   partType:v.technicalSpecs?.find(s=>s.key==='نوع قطعه')?.value,
   model:v.model||null,catalogMarking:review.catalogPartCode||null,
-  referenceLengthCheck:review.designationCheck ? {status:review.designationCheck.status,designation:review.designationCheck.designation,lengthMm:review.designationCheck.lengthMm,teeth:review.designationCheck.teeth,pdfPage:review.designationCheck.pdfPage,source:sourceIndex(review.designationCheck.sourceUrl)} : null,
-  outcome:review.designationCheck?.status==='listed-reference-length'?'nominal-length-in-primary-table':review.catalogPartCode?'original-marking-only':'incomplete-manufacturer-identity',
+  referenceLengthCheck:review.designationCheck ? {status:review.designationCheck.status,designation:review.designationCheck.designation,lengthMm:review.designationCheck.lengthMm,teeth:review.designationCheck.teeth,pdfPage:review.designationCheck.pdfPage,sourcePage:review.designationCheck.sourcePage,source:sourceIndex(review.designationCheck.sourceUrl)} : null,
+  ownerCatalogue:review.ownerCatalogue||null,
+  outcome:review.ownerCatalogue?(review.ownerCatalogue.conflict?'owner-table-conflict':'owner-table-dimensions'):review.designationCheck?.status==='listed-reference-length'?'nominal-length-in-primary-table':review.catalogPartCode?'original-marking-only':'incomplete-manufacturer-identity',
   references:[...new Set([...review.references,...(review.comparisonReferences||[])].map(r=>sourceIndex(r.url)))],
   warnings:review.researchWarnings||[],
  };

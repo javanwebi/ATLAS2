@@ -1,11 +1,13 @@
 import { partResearchRequirements, type ComparisonReference } from './partResearchRequirements';
 import { classifyPartName } from './partClassification';
 import { checkImperialDesignation, type DesignationCheck } from './imperialTimingReference';
+import { ownerPinDimensions, type OwnerCatalogueEvidence } from './ownerCatalogue';
 import type { Product, ProductVariant, TechnicalSpec } from '../types';
 
 export const TECHNICAL_REFERENCES = {
   imperial: { title: 'Optibelt — Imperial timing belt designation', url: 'https://www.optibelt.com/fileadmin/pdf/produkte/zahnriemen-gummi/Optibelt-TM-Rubber-Timing-Belt-Drives.pdf' },
   mitsuboshiTiming: { title: 'Mitsuboshi — Standard timing belt size tables', url: 'https://global.mitsuboshi.com/assetFiles/timing_belt_design_manual_en.pdf' },
+  misumiTiming: { title:'MISUMI — H timing belts, reference lengths',url:'https://th.c.misumi-ec.com/book/THA_EconomySeries_e-catalog2023_2nd/files/basic-html/page605.html' },
   imperialStandard: { title: 'ISO 19347:2015 — Imperial trapezoidal belts and pulleys', url: 'https://www.iso.org/standard/64662.html' },
   bearing62200: { title:'ISK — 62200 nominal boundary dimensions',url:'https://iskbearing.com/product-details/62200' },
   wedge: { title: 'Optibelt — Wedge belt profiles', url: 'https://www.optibelt.com/fileadmin/pdf/kataloge/Optibelt-Power-Transmission-product-range-belts.pdf' },
@@ -24,9 +26,10 @@ export interface TechnicalReview {
   originalTechnicalType?: string;
   designationCheck?: DesignationCheck;
   researchWarnings?: string[];
+  ownerCatalogue?: OwnerCatalogueEvidence;
   requiredChecks?: string[];
   comparisonReferences?: ComparisonReference[];
-  evidence: { key: string; basis: 'catalog' | 'profile-reference' | 'admin'; source?: Reference; value?: string }[];
+  evidence: { key: string; basis: 'catalog' | 'owner-catalogue' | 'profile-reference' | 'admin'; source?: Reference; value?: string }[];
   references: { title: string; url: string }[];
   missing: string[];
   note: string;
@@ -101,11 +104,12 @@ export function enrichTechnicalVariant(product: Product, variant: ProductVariant
         designationCheck={status:'reference-conflict',designation:`${imperial[1]}MXL`,sourceUrl:TECHNICAL_REFERENCES.imperial.url,identityVerified:false};
         researchWarnings.push('روش عددگذاری MXL در کاتالوگ Optibelt و Mitsuboshi یکسان نیست؛ بدون تعیین سازنده، طول از عدد مدل استخراج نمی‌شود.');
       }
-      const lengthReference: Reference=designationCheck.sourceUrl===TECHNICAL_REFERENCES.mitsuboshiTiming.url ? 'mitsuboshiTiming' : 'imperial';
+      const lengthReference: Reference=designationCheck.sourceUrl.includes('misumi-ec.com') ? 'misumiTiming' : designationCheck.sourceUrl===TECHNICAL_REFERENCES.mitsuboshiTiming.url ? 'mitsuboshiTiming' : 'imperial';
       if(designationCheck.status==='listed-reference-length') {
         add('طول گام در جدول مرجع',`${num(designationCheck.lengthMm!)} میلی‌متر`,lengthReference);
         add('تعداد دندانه در جدول مرجع',String(designationCheck.teeth),lengthReference);
-        add('صفحهٔ PDF مرجع طول',String(designationCheck.pdfPage),lengthReference);
+        if(designationCheck.pdfPage)add('صفحهٔ PDF مرجع طول',String(designationCheck.pdfPage),lengthReference);
+        if(designationCheck.sourcePage)add('صفحهٔ چاپی مرجع طول',String(designationCheck.sourcePage),lengthReference);
       } else add('ابهام نام‌گذاری طول',designationCheck.status==='reference-conflict' ? 'طول و تعداد دندانه در جدول مرجع ناسازگار است؛ طول منتشر نشده و دیتاشیت همان سازنده لازم است' : 'این کد طول در جدول بررسی‌شده وجود ندارد؛ طول و تعداد دندانه بدون دیتاشیت همان مدل منتشر نمی‌شود');
       if(widthCode && /^(012|019|025|031|037|043|050|063|075|100|150|200|250|300|400|500)$/.test(widthCode))
         add('عرض از کد سه‌رقمی اینچی (مرجع)',`${num(Number(widthCode)*0.254)} میلی‌متر`,'imperial');
@@ -166,6 +170,12 @@ export function enrichTechnicalVariant(product: Product, variant: ProductVariant
   const dimensionSequence=name.match(/\d+(?:[./]\d+)?(?:\s*[*×]\s*\d+(?:[./]\d+)?){1,3}/)?.[0];
   if(dimensionSequence) add('توالی ابعاد درج‌شده (محورها و واحد تأیید نشده)',dimensionSequence);
   if(technicalCode) add('کد فنی خوانده‌شده از شرح کالا',technicalCode);
+  const owner=ownerPinDimensions(variant.code,variant.name);
+  if(owner){
+    type='پین سر رولر';
+    if(owner.evidence.conflict)researchWarnings.push(owner.evidence.conflict);
+    for(const spec of owner.specifications){specs.push(spec);evidence.push({...spec,basis:'owner-catalogue'});}
+  }
   add('نوع قطعه',type);
   const missing = ['دیتاشیت همان سازنده / تطبیق با پلاک کالا'];
   if(!model && !variant.model) missing.push('مدل فنی قابل‌تأیید');
@@ -173,7 +183,7 @@ export function enrichTechnicalVariant(product: Product, variant: ProductVariant
   if(!product.brand || product.brand === 'ثبت نشده') missing.push('سازنده');
   const requirements=partResearchRequirements(type,name);
   const review: TechnicalReview = {
-    requiredChecks:requirements.checks, comparisonReferences:requirements.comparisonReferences, researchWarnings,
+    requiredChecks:requirements.checks, comparisonReferences:requirements.comparisonReferences, researchWarnings,ownerCatalogue:owner?.evidence,
     status:refs.size ? 'reference-enriched' : model || technicalCode || catalogPartCode ? 'catalog-extracted' : 'needs-identification',
     categoryPath:[product.categoryName, product.submenu || product.subcategory, type, ...(model ? [model] : [])],
     technicalCode, catalogPartCode, designationCheck, standardStatus:refs.size ? 'reference-only' : 'not-established', originalTechnicalType:product.subcategory, evidence:evidence.map(e => variant.technicalSpecs?.some(s => s.key === e.key && s.value !== specs.find(x=>x.key === e.key)?.value) ? {key:e.key,basis:'admin' as const} : e), references:[...refs].map(key=>TECHNICAL_REFERENCES[key]), missing,

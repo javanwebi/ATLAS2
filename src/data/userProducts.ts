@@ -1,4 +1,5 @@
 import { enrichProductTechnicalData } from './productTechnicalData';
+import { applyCatalogueCorrections } from './catalogueCorrections';
 import { groupProductFamilies } from './productFamilies';
 import type { Product } from '../types';
 import source from './catalogueSource.json';
@@ -17,7 +18,7 @@ export const USER_PRODUCTS_RAW: Product[] = source.map(family => {
     ...(family.profiles ? [{ key: 'پروفیل‌ها', value: family.profiles }] : []),
     ...(family.materials ? [{ key: 'جنس‌های ثبت‌شده', value: family.materials }] : []),
   ];
-  return {
+  return applyCatalogueCorrections({
     code: family.code, name: family.name, brand: family.brand || 'ثبت نشده',
     categorySlug: categorySlugFor(family.categoryName), categoryName: family.categoryName,
     submenu: family.submenu, subcategory: family.technicalType,
@@ -29,7 +30,7 @@ export const USER_PRODUCTS_RAW: Product[] = source.map(family => {
     imageScope: images.length ? 'family-example' as const : undefined,
     unit: family.unit || 'عدد', tags: [family.submenu, family.technicalType, family.profiles || ''],
     description: `${family.name}؛ ${family.itemCount.toLocaleString('fa-IR')} کد کالا در این خانواده ثبت شده است. سایز و کد مورد نیاز را از فهرست زیر انتخاب کنید. قیمت و موجودی پس از استعلام اعلام می‌شود.`,
-  };
+  });
 });
 
 // Stable, readable URLs are derived from the source category, never from row order.
