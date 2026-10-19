@@ -1,4 +1,4 @@
-// Atlas Visual Catalog Recognition Cloudflare Worker (v7.1)
+// Atlas Visual Catalog Recognition Cloudflare Worker (v8.1 — linked multimodal images)
 // High-performance AI visual part recognition and 864-product catalog matching.
 // Compatible with Google Gemini 3.x / 2.5 models and OpenAI-compatible endpoints.
 
@@ -19,7 +19,6 @@ const GEMINI_CASCADE_MODELS = [
 const DEFAULT_CATALOG_URL =
   'https://raw.githubusercontent.com/javanwebi/atlastrai/main/src/data/catalogSummary.json';
 
-const EXPECTED_TOKEN = 'PART_RECOGNITION_WORKER_TOKEN';
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '*';
@@ -54,15 +53,10 @@ function errorResponse(type, message, status = 400, headers = {}) {
 }
 
 function authorize(request, env) {
-  const expected = (env && env.APP_WORKER_TOKEN) || EXPECTED_TOKEN;
-  const authHeader = request.headers.get('Authorization') || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-
-  // If token matches or if x-gemini-key is present, authorize
-  if (token === expected || token === EXPECTED_TOKEN || !expected || request.headers.get('X-Gemini-Key')) {
-    return true;
-  }
-  return false;
+  const expected = String(env?.APP_WORKER_TOKEN || '').trim();
+  if (!expected) return false;
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  return token === expected;
 }
 
 // Convert Uint8Array to base64
@@ -415,6 +409,60 @@ function matchCatalogProducts(recognition, catalog) {
   return { matchedProducts, similarCandidates: [], exactVisualMatch };
 }
 
+async function resolveComparisonImage(value) {
+  const inline=String(value || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if(inline && inline[2].length<=14*1024*1024)return {mimeType:inline[1],data:inline[2]};
+  const url=new URL(String(value || ''));
+  const host=url.hostname.toLowerCase();
+  if(url.protocol!=='https:' || url.username || url.password || host==='localhost' || host.endsWith('.local') || /^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::|\[?f[cd]|\[?fe[89ab])/i.test(host))throw new Error('Invalid public image URL');
+  const response=await fetch(url,{signal:AbortSignal.timeout(15000),redirect:'error',headers:{Accept:'image/jpeg,image/png,image/webp'}});
+  if(!response.ok)throw new Error('Image URL unavailable');
+  let mimeType=(response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+  if(mimeType==='image/jpg')mimeType='image/jpeg';
+  if(!['image/jpeg','image/png','image/webp'].includes(mimeType))throw new Error('URL did not return an image');
+  if(Number(response.headers.get('content-length') || 0)>10*1024*1024)throw new Error('Image too large');
+  const reader=response.body.getReader();const chunks=[];let length=0;
+  while(true){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>10*1024*1024){await reader.cancel();throw new Error('Image too large');}chunks.push(value);}
+  const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+  let binary='';for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
+  return {mimeType,data:btoa(binary)};
+}
+
+// Explicit multi-image route used by exhaustive catalogue scans. No legacy catalogue matching.
+async function handleMultimodalComparison(body, env, cors) {
+  const apiKey=env?.GEMINI_API_KEY || SOURCE_AI_API_KEY;
+  if(!apiKey)return errorResponse('ai_not_configured','کلید هوش مصنوعی ورکر تنظیم نشده است.',503,cors);
+  const contents=[];let imageCount=0;
+  for(const message of (Array.isArray(body.messages) ? body.messages : []).slice(-8)) {
+    const parts=[];
+    for(const part of (Array.isArray(message.content) ? message.content : [])) {
+      if(part.type==='text' && typeof part.text==='string')parts.push({text:part.text.slice(0,20000)});
+      if(part.type==='image_url') {
+        let image;
+        try{image=await resolveComparisonImage(part.image_url?.url);}catch{return errorResponse('invalid_image','لینک تصویر در دسترس نیست یا فایل تصویر معتبر نیست.',400,cors);}
+        imageCount++;parts.push({inlineData:image});
+      }
+    }
+    if(parts.length)contents.push({role:message.role==='assistant' ? 'model' : 'user',parts});
+  }
+  if(imageCount<1 || imageCount>10)return errorResponse('invalid_image_count','تعداد تصاویر درخواست معتبر نیست.',400,cors);
+  const models=[...new Set([env?.GEMINI_VISION_MODEL,body.model,'gemini-flash-latest',...GEMINI_CASCADE_MODELS].filter(Boolean))];
+  for(const model of models) {
+    try {
+      const response=await fetch(`${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent`,{
+        method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},signal:AbortSignal.timeout(30000),
+        body:JSON.stringify({contents,generationConfig:{temperature:0.1,responseMimeType:'application/json',maxOutputTokens:4096}}),
+      });
+      if(!response.ok)continue;
+      const data=await response.json();
+      const text=(data.candidates?.[0]?.content?.parts || []).map(part=>part.text || '').join('');
+      JSON.parse(text);
+      return jsonResponse({protocol:'atlas-multimodal-v1',model,choices:[{message:{role:'assistant',content:text}}]},200,cors);
+    }catch{}
+  }
+  return errorResponse('vision_unavailable','مدل بینایی در دسترس نیست؛ مقایسه انجام نشده است.',503,cors);
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
@@ -432,12 +480,14 @@ export default {
           {
             status: 'ok',
             service: 'Atlas AI Visual Catalog Recognition Worker',
-            version: '7.1',
+            version: '8.1',
+            multimodal_protocol: 'atlas-multimodal-v1',
+            image_source_modes: ['https-url','inline'],
             ai_provider: 'gemini',
             primary_models: GEMINI_CASCADE_MODELS,
             catalog_mode: 'worker_ai_visual_matching',
             catalog_source: DEFAULT_CATALOG_URL,
-            api_key_configured: Boolean(SOURCE_AI_API_KEY),
+            api_key_configured: Boolean(env?.GEMINI_API_KEY || SOURCE_AI_API_KEY),
           },
           200,
           cors
@@ -471,6 +521,8 @@ export default {
         } catch {
           return errorResponse('invalid_json', 'درخواست باید شامل بدنه معتبر JSON باشد.', 400, cors);
         }
+
+        if(body?.task==='catalog-image-scan')return handleMultimodalComparison(body,env,cors);
 
         // 1. Resolve customer image buffer in base64 from direct base64, data URL or image link
         const imageBase64 = await resolveImageBase64(body);

@@ -47,7 +47,7 @@ test('a dedicated but shared photo cannot uniquely certify two codes; unavailabl
 test('worker multimodal transport sends images and prompt, never direct keys or invented authentication',async()=>{
  let sent:any;
  const answer=await workerVision([{role:'user',parts:[{text:'inspect'},{inlineData:{mimeType:'image/png',data:'YWJj'}}]}],{
-  env:{'ai-forza':'PRIVATE-KEY',GEMINI_API_KEY:'OTHER-PRIVATE'},
+  env:{PART_RECOGNITION_WORKER_URL:'https://custom-worker.example','ai-forza':'PRIVATE-KEY',GEMINI_API_KEY:'OTHER-PRIVATE'},
   fetch:(async(url,options)=>{sent={url,...options};return new Response(JSON.stringify({choices:[{message:{content:'{"detected_part_type":"فنر"}'}}]}),{status:200});}) as typeof fetch,
  });
  assert.ok(answer.text.includes('فنر'));
@@ -68,4 +68,29 @@ test('only an explicitly reviewed dedicated photo can support image identity',()
  assert.equal(result.similarCandidates[0].code,'124');
  copy[0].galleryImages[0].identityVerified=false;
  assert.equal(finalizeRecognition({summary:{},matchedProducts:[{code:'123',visualDistance:0}]},recognitionCatalog(copy)).matchedProducts.length,0);
+});
+
+test('legacy Worker wrapping is unwrapped for one image and rejected for multi-image comparison',async()=>{
+ const data={recognition:{detected_part_type:'فنر'},choices:[{message:{content:'{"recognition":{"detected_part_type":"فنر"}}'}}]};
+ const fetchMock=(async()=>new Response(JSON.stringify(data),{status:200})) as typeof fetch;
+ const part={inlineData:{mimeType:'image/png',data:'YQ=='}};
+ const result=await workerVision([{role:'user',parts:[part]}],{env:{},fetch:fetchMock});
+ assert.equal(JSON.parse(result.text).detected_part_type,'فنر');
+ await assert.rejects(()=>workerVision([{role:'user',parts:[part,part]}],{env:{},fetch:fetchMock}),/upgrade required/);
+});
+
+test('the supplied Worker host never receives a source-default credential',async()=>{
+ let headers:any;
+ await workerVision([{role:'user',parts:[{text:'test'}]}],{env:{},fetch:(async(_url,options)=>{
+  headers=options?.headers;return new Response('{"choices":[{"message":{"content":"{}"}}]}',{status:200});
+ }) as typeof fetch});
+ assert.equal(headers.Authorization,undefined);
+});
+test('Workers reject requests without a configured access secret, even with a provider key header',async()=>{
+ for(const file of ['../worker.js','../cloudflare-worker/worker.js']){
+  const worker=(await import(file)).default;
+  const request=new Request('https://worker.example/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','X-Gemini-Key':'fixture'},body:'{}'});
+  const response=await worker.fetch(request,{});
+  assert.equal(response.status,401);
+ }
 });

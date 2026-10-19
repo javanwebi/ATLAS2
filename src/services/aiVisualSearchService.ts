@@ -67,6 +67,8 @@ export interface MatchedPartItem {
   image?: string;
 }
 
+export interface ImageScanProgress {stage:'preparing'|'scanning'|'verifying'|'complete';total:number;compared:number;failed:number;}
+export interface CatalogPhotoMatch {imageId:string;image:string;label:string;score:number;reason:string;bindings:{familyCode:string;code?:string;verified:boolean}[];}
 export interface AiPartAnalysisResult {
   success: boolean;
   isAiGenerated: boolean;
@@ -85,6 +87,8 @@ export interface AiPartAnalysisResult {
     catalogAvailability?: CatalogAvailability;
     verifiedCandidateCount?: number; // Legacy count alias; results are ranked, not independently verified by Gemini.
   };
+  catalogImageMatches?: CatalogPhotoMatch[];
+  scanCoverage?: {total:number;compared:number;failed:number;complete:boolean;providerAvailable:boolean;failedImageIds:string[]};
   matchedProducts: MatchedPartItem[];
   rejectedCandidates?: MatchedPartItem[]; // (legacy, kept empty) items rejected as 'different'
   similarCandidates?: MatchedPartItem[]; // server-ranked real catalog alternatives from visual and/or technical search
@@ -163,7 +167,7 @@ export const aiVisualSearchService = {
     return uploadResponseData(response);
   },
 
-  async analyzePartWithAi(request: AiPartAnalysisRequest): Promise<AiPartAnalysisResult> {
+  async analyzePartWithAi(request: AiPartAnalysisRequest, onProgress?: (progress:ImageScanProgress)=>void): Promise<AiPartAnalysisResult> {
     assertBackendConfigured();
 
     let imageUrl = request.imageUrl;
@@ -189,7 +193,22 @@ export const aiVisualSearchService = {
       throw new Error(failure?.error?.message || `خطای ارتباط با سرور هوش مصنوعی: کد ${response.status}`);
     }
 
-    const data: AiPartAnalysisResult = await response.json();
+    let data: AiPartAnalysisResult = await response.json();
+    if(response.status===202) {
+      const jobId=(data as any).jobId;
+      if(typeof jobId!=='string')throw new Error('شناسهٔ بررسی تصاویر دریافت نشد.');
+      const deadline=Date.now()+30*60*1000;
+      while(true) {
+        if(Date.now()>deadline)throw new Error('مهلت بررسی کامل تصاویر تمام شد؛ دوباره تلاش کنید.');
+        await new Promise(resolve=>setTimeout(resolve,1200));
+        const poll=await fetch(apiUrl(`/api/ai/recognition-jobs/${encodeURIComponent(jobId)}`),{cache:'no-store'});
+        const job=await poll.json();
+        if(!poll.ok)throw new Error(job.error?.message || 'دریافت وضعیت بررسی تصاویر ناموفق بود.');
+        if(job.progress)onProgress?.(job.progress);
+        if(job.status==='failed')throw new Error(job.error || 'بررسی تصاویر کامل نشد.');
+        if(job.status==='complete'){data=job.result;break;}
+      }
+    }
 
     // Enrich only by the exact product code. Never invent a catalog result
     // through a partial name match or generated fallback product.

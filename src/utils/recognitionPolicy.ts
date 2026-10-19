@@ -45,7 +45,8 @@ export function finalizeRecognition(result: any, catalog: ReturnType<typeof reco
     const codeProof=readCode === normalizeCode(item.code) && Number.isFinite(Number(recognition.code_read_confidence)) && Number(recognition.code_read_confidence)>=90;
     const photoProof=item.imageIdentityVerified && item.imageScope === 'variant' && imageOwners.get(item.image)?.size===1 && Number(candidate.visualDistance)<=0.08;
     const exact=codeProof || photoProof;
-    return [{...candidate, code:item.code,name:item.name,brand:item.brand,specs:item.specs,image:item.image || undefined,
+    const scannedPhoto=(result.catalogImageMatches || []).find((photo:any)=>photo.imageId===candidate.matchedImageId && photo.bindings?.some((binding:any)=>binding.code===item.code));
+    return [{...candidate, code:item.code,name:item.name,brand:item.brand,specs:item.specs,image:scannedPhoto?.image || item.image || undefined,
       imageScope:item.imageScope,identityEvidence:codeProof ? 'read-inventory-code' : photoProof ? 'dedicated-catalogue-photo' : 'similarity-only',
       visualVerdict:exact ? 'exact_match' : 'very_similar',
       matchReason:exact ? 'تطبیق با کد خوانده‌شده یا عکس اختصاصی همان کالا؛ کنترل نهایی ابعاد لازم است.' : 'شباهت ظاهری یا فنی؛ هویت دقیق کد از تصویر تأیید نشده است.',
@@ -66,9 +67,10 @@ export function finalizeRecognition(result: any, catalog: ReturnType<typeof reco
     }
   }
   const exact=matchedProducts.length>0;
+  const hasPhotoMatches=(result.catalogImageMatches || []).length>0;
   return {...result,recognitionPolicy:'inventory-v1',isAiGenerated:aiAvailable, matchedProducts,similarCandidates,rejectedCandidates:[],
     summary:{...result.summary,confidence:aiAvailable ? Math.min(exact ? 99 : 89,Number(result.summary?.confidence) || 0) : 0, confidenceNote:'امتیاز شباهت، احتمال قطعی هویت کالا نیست.',exactVisualMatch:exact,verifiedCandidateCount:matchedProducts.length+similarCandidates.length,
-      catalogAvailability:{status:exact ? 'confirmed_in_catalog' : similarCandidates.length ? 'similar_in_catalog' : 'custom_order_available',
-        statusFarsiTitle:exact ? 'کالای منطبق و محصولات مشابه' : similarCandidates.length ? 'این محصولات شبیه قطعه شما هستند' : 'تطبیق قابل اتکا پیدا نشد',
+      catalogAvailability:{status:exact ? 'confirmed_in_catalog' : (similarCandidates.length || hasPhotoMatches) ? 'similar_in_catalog' : 'custom_order_available',
+        statusFarsiTitle:exact ? 'کالای منطبق و محصولات مشابه' : (similarCandidates.length || hasPhotoMatches) ? 'تصاویر و محصولات مشابه پیدا شدند؛ کد دقیق را کنترل کنید' : 'تطبیق قابل اتکا پیدا نشد',
         statusFarsiMessage:exact ? 'کد منطبق پیدا شد؛ موجودی، ابعاد و شرایط کارکرد پیش از سفارش باید بررسی شوند.' : 'عدم تأیید تطبیق دقیق به معنی نبود کالا در انبار نیست. برای تشخیص دقیق‌تر، عکس نوشتهٔ قطعه و ابعاد را ارسال کنید.'}}};
 }

@@ -1,6 +1,6 @@
 import { memberPath } from "../storefront/MemberAccess";
 import React, { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Camera,
@@ -69,34 +69,10 @@ interface AnalysisPhase {
 }
 
 const ANALYSIS_PHASES: AnalysisPhase[] = [
-  {
-    title: "اسکن هندسه مقطع و دندانه‌ها",
-    en: "GEOMETRY SCAN",
-    icon: Scan,
-    tag: "هندسه و مقطع",
-    detail: "بررسی عمق و زاویه شیار",
-  },
-  {
-    title: "محاسبه گام و ابعاد استاندارد",
-    en: "PITCH & DIMENSIONS",
-    icon: Ruler,
-    tag: "گام و ابعاد",
-    detail: "اندازه‌گیری گام برحسب میلیمتر",
-  },
-  {
-    title: "تشخیص ساختار و نوع متریال",
-    en: "MATERIAL IDENTIFICATION",
-    icon: Layers,
-    tag: "نوع متریال",
-    detail: "تشخیص پلی‌یورتان یا لاستیک",
-  },
-  {
-    title: "انطباق با کاتالوگ قطعات اطلس",
-    en: "CATALOG MATCHING",
-    icon: Cpu,
-    tag: "کاتالوگ اطلس",
-    detail: "بررسی موجودی و کدهای معادل",
-  },
+  {title:"آماده‌سازی تصویر مشتری",en:"IMAGE PREPARATION",icon:Scan,tag:"تصویر مشتری",detail:"بررسی کیفیت و نشانه‌های قابل مشاهده"},
+  {title:"خواندن نوشته و ویژگی‌های ظاهری",en:"VISIBLE FEATURES",icon:Ruler,tag:"نشانه‌های قطعه",detail:"بدون حدس ابعاد یا جنس نامشخص"},
+  {title:"مقایسه تمام تصاویر کاتالوگ",en:"FULL CATALOGUE SCAN",icon:Layers,tag:"همهٔ تصاویر",detail:"بررسی عکس‌های کاتالوگ و تصاویر تازه"},
+  {title:"بررسی دوبارهٔ گزینه‌های مشابه",en:"DETAILED COMPARISON",icon:Cpu,tag:"بررسی دقیق‌تر",detail:"مقایسهٔ جزئیات با وضوح بالاتر"},
 ];
 
 export const AiVisualPartSearchModal: React.FC<Props> = ({
@@ -119,28 +95,10 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
   const [mimeType, setMimeType] = useState<string>("image/jpeg");
   const [length, setLength] = useState<string>("");
 
-  // Dynamic scanning simulation state while analyzing
-  const [analysisProgress, setAnalysisProgress] = useState<number>(18);
-  const [analysisPhaseIndex, setAnalysisPhaseIndex] = useState<number>(0);
-
-  React.useEffect(() => {
-    if (currentStep !== "analyzing") {
-      setAnalysisProgress(18);
-      setAnalysisPhaseIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev >= 94) return 94;
-        const jump = Math.floor(Math.random() * 7) + 5;
-        return Math.min(prev + jump, 94);
-      });
-      setAnalysisPhaseIndex((prev) => (prev + 1) % ANALYSIS_PHASES.length);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [currentStep]);
+  // Progress reflects completed image comparisons returned by the server.
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisPhaseIndex, setAnalysisPhaseIndex] = useState(0);
+  const [scanCounts,setScanCounts]=useState<{compared:number;total:number;stage:string}|null>(null);
   const [width, setWidth] = useState<string>("");
   const [pitch, setPitch] = useState<string>("");
   const [application, setApplication] = useState<string>("");
@@ -388,6 +346,9 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
 
     setErrorMessage("");
     setPendingStage(stage);
+    setAnalysisProgress(0);
+    setAnalysisPhaseIndex(0);
+    setScanCounts(null);
     setCurrentStep("analyzing");
 
     try {
@@ -401,6 +362,10 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
         application: application.trim() || undefined,
         features: features.trim() || undefined,
         stage,
+      }, progress => {
+        setScanCounts(progress);
+        setAnalysisProgress(progress.total ? Math.floor(progress.compared*100/progress.total) : 0);
+        setAnalysisPhaseIndex(progress.stage==='verifying' ? 3 : progress.stage==='scanning' ? 2 : 0);
       });
 
       setAnalysisResult(result);
@@ -1326,13 +1291,13 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                       </span>
                       <span className="hidden sm:inline text-slate-300">|</span>
                       <span className="hidden sm:inline text-[11px] text-slate-400">
-                        پردازش ابعاد و متریال
+                        مقایسهٔ عکس با تصاویر کاتالوگ
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <div className="px-3 py-1 rounded-full bg-orange-50 border border-orange-200/80 text-[#C95210] text-xs font-bold font-mono shadow-2xs">
-                        {toPersianDigits(analysisProgress)}٪ در حال بررسی
+                        {scanCounts ? `${toPersianDigits(scanCounts.compared)} از ${toPersianDigits(scanCounts.total)} تصویر` : "در حال آماده‌سازی بررسی تصاویر"}
                       </div>
                     </div>
                   </div>
@@ -1712,6 +1677,31 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                   </div>
                 )}
 
+                {analysisResult.scanCoverage && (
+                  <p role="status" className="text-xs text-slate-600 leading-6 border border-slate-200 rounded-xl p-3">
+                    {toPersianDigits(analysisResult.scanCoverage.compared)} از {toPersianDigits(analysisResult.scanCoverage.total)} تصویر با هوش مصنوعی بررسی شد.
+                    {analysisResult.scanCoverage.complete ? " بررسی تمام تصاویر کامل شد." : " بررسی کامل کاتالوگ انجام نشده است؛ نتیجه موقت است."}
+                  </p>
+                )}
+                {!!analysisResult.catalogImageMatches?.length && (
+                  <section className="space-y-3" aria-label="تصاویر مشابه در کاتالوگ">
+                    <h4 className="font-bold text-sm text-slate-800">تصاویر مشابه پیدا‌شده در کاتالوگ</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {analysisResult.catalogImageMatches.map(photo=>(
+                        <article key={photo.imageId} className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+                          <img src={photo.image} alt={photo.label} className="w-full h-36 object-contain" loading="lazy" />
+                          <p className="text-xs font-bold text-slate-700">{photo.label}</p>
+                          <p className="text-xs leading-6 text-slate-500">{photo.reason}</p>
+                          {photo.bindings.some(binding=>binding.code) && !photo.bindings.some(binding=>binding.verified) && <p className="text-xs text-slate-500">کدهای متصل به عکس؛ تعلق دقیق تصویر به این کدها هنوز تأیید نشده است.</p>}
+                          {[...new Set(photo.bindings.flatMap(binding=>binding.code ? [binding.code] : []))].map(code=>(
+                            <Link key={code} to={`/product/${encodeURIComponent(code)}`} onClick={onClose} className="inline-block border rounded-lg px-2 py-1 m-1 text-xs text-orange-700">مشخصات کد {code}</Link>
+                          ))}
+                          {!photo.bindings.some(binding=>binding.code) && <p className="text-xs text-slate-500">تصویر کاتالوگی مشابه؛ کد دقیق این عکس هنوز تأیید نشده است.</p>}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
                 {/* Strong visual evidence banner */}
                 {analysisResult.summary.exactVisualMatch &&
                   analysisResult.matchedProducts.some(

@@ -1,3 +1,8 @@
+import { createVisionImagePublisher, cleanVisionImageLinks, type ImagePublisher } from './src/services/visionImageLinks';
+import { lookup } from 'node:dns/promises';
+import { buildCatalogImageCorpus, officialImageFile } from './src/services/catalogImageCorpus';
+import { scanEveryCatalogImage, type ScanProgress } from './src/services/exhaustiveImageScan';
+import { RecognitionJobs } from './src/services/recognitionJobs';
 import inventorySource from './src/data/catalogueSource.json';
 import { workerVision } from './src/services/partRecognitionGateway';
 import { recognitionWorkerUrl, recognitionApiKey, recognitionCatalog, finalizeRecognition } from './src/utils/recognitionPolicy';
@@ -235,8 +240,11 @@ function getPublicAppBaseUrl(req: express.Request): string {
   }
 }
 
+function visionImagePublicOrigin(req:express.Request):string {
+  return (process.env.VISION_IMAGE_PUBLIC_ORIGIN || getPublicAppBaseUrl(req)).trim().replace(/\/+$/,'');
+}
 function customerImagePublicUrl(req: express.Request, fileName: string): string {
-  return `${getPublicAppBaseUrl(req)}/imageai/${encodeURIComponent(fileName)}`;
+  return `${visionImagePublicOrigin(req)}/imageai/${encodeURIComponent(fileName)}`;
 }
 
 function normalizeBrowserOrigin(value: string): string | null {
@@ -527,11 +535,20 @@ interface CatalogItem {
 let CATALOG_ITEMS: CatalogItem[] = [];
 
 const inventoryCodes=new Set(inventorySource.flatMap(family=>family.variants.map(v=>v.code)));
-function refreshRecognitionCatalog() {
+function recognitionProducts() {
   const overrides=loadCatalogOverridesDb();
   const deleted=new Set(overrides.deletedCodes);
-  const products=getManagedCatalogProducts().filter(p=>!deleted.has(p.code)).map(p=>({...p,...overrides.families[p.code]}));
-  CATALOG_ITEMS = recognitionCatalog(products,inventoryCodes);
+  const demoCodes=new Set(['34265-Z18','34265-Z22','34265-Z28']);
+  const products=new Map(getManagedCatalogProducts().map(p=>[p.code,p]));
+  for(const [code,patch] of Object.entries(overrides.families)) products.set(code,{...products.get(code),...patch});
+  return [...products.values()].filter(p=>!deleted.has(p.code) && p.name && Array.isArray(p.variants)).map(p=>{
+    const variants=(p.variants || []).filter(v=>!demoCodes.has(v.code));
+    for(const variant of variants)inventoryCodes.add(variant.code);
+    return {...p,variants};
+  });
+}
+function refreshRecognitionCatalog() {
+  CATALOG_ITEMS = recognitionCatalog(recognitionProducts(),inventoryCodes);
 }
 refreshRecognitionCatalog();
 console.log(`[Server] Loaded ${CATALOG_ITEMS.length} real inventory SKUs for recognition.`);
@@ -542,9 +559,9 @@ console.log(`[Server] Loaded ${CATALOG_ITEMS.length} real inventory SKUs for rec
 // dHash (difference hash). Resistant to resize/recompress/watermark shifts.
 // ============================================================================
 
-const IMAGE_HASH_CACHE_PATH = path.join(process.cwd(), 'src', 'data', 'imageHashes.json');
+const IMAGE_HASH_CACHE_PATH = process.env.IMAGE_HASH_CACHE_PATH || path.join(process.cwd(), 'src', 'data', 'imageHashes.json');
 const GITHUB_CATALOG_IMAGES_REPO = 'https://raw.githubusercontent.com/javanweb/imagesatlas/main';
-const CATALOG_IMAGES_CACHE_DIR = path.join(process.cwd(), '.cache', 'catalog_images');
+const CATALOG_IMAGES_CACHE_DIR = process.env.CATALOG_IMAGES_CACHE_DIR || path.join(process.cwd(), '.cache', 'catalog_images');
 
 // Ensure catalog images cache folder exists
 try {
@@ -849,53 +866,46 @@ function buildCatalogImageAliases(): void {
 }
 
 function normalizeCatalogImageFilename(image?: string): string {
-  const clean = (image || '').trim().toLowerCase();
-  if (!clean) return 'e(1).png';
-  if (CATALOG_IMAGE_ALIASES.has(clean)) {
-    return CATALOG_IMAGE_ALIASES.get(clean)!;
-  }
-  const m = clean.match(/(?:e\(?|at-e)?(\d+)\)?(?:\.(png|jpe?g|webp|svg))?/i);
-  if (m) {
-    const num = parseInt(m[1], 10);
-    const normalizedNum = ((Math.abs(num) - 1) % 869) + 1;
-    return `e(${normalizedNum}).png`;
-  }
-  return clean.endsWith('.png') ? clean : `${clean}.png`;
+  return officialImageFile(image || '') || '';
 }
-
-function resolveCatalogImagePath(image?: string): string | null {
-  const filename = normalizeCatalogImageFilename(image);
-  const cached = path.join(CATALOG_IMAGES_CACHE_DIR, filename);
-  if (fs.existsSync(cached)) return cached;
-  return null;
+function resolveCatalogImagePath(image?:string):string|null {
+  const file=normalizeCatalogImageFilename(image);
+  if(!file)return null;
+  const candidate=path.join(CATALOG_IMAGES_CACHE_DIR,file);
+  return fs.existsSync(candidate) ? candidate : null;
 }
-
-async function getCatalogImageBuffer(image?: string): Promise<Buffer | null> {
-  const filename = normalizeCatalogImageFilename(image);
-  const cachedPath = path.join(CATALOG_IMAGES_CACHE_DIR, filename);
-
-  if (fs.existsSync(cachedPath)) {
-    try {
-      return fs.readFileSync(cachedPath);
-    } catch {}
-  }
-
-  // Fetch directly from GitHub repository javanweb/imagesatlas
+async function getCatalogImageBuffer(image?:string, revision=''):Promise<Buffer|null> {
+  if(!image)return null;
+  const official=officialImageFile(image);
+  const filename=official || crypto.createHash('sha256').update(image+revision).digest('hex')+'.image';
+  const cachedPath=path.join(CATALOG_IMAGES_CACHE_DIR,filename);
+  try {if(fs.existsSync(cachedPath))return fs.readFileSync(cachedPath);}catch{}
+  let buffer:Buffer|null=null;
   try {
-    const url = `${GITHUB_CATALOG_IMAGES_REPO}/${encodeURIComponent(filename)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    if (res.ok) {
-      const arr = await res.arrayBuffer();
-      const buf = Buffer.from(arr);
-      try {
-        fs.writeFileSync(cachedPath, buf);
-      } catch {}
-      return buf;
+    if(/^data:image\/[a-zA-Z0-9+.-]+[;,]/i.test(image)) {
+      const payload=image.slice(image.indexOf(',')+1);
+      if(payload.length>14*1024*1024)return null;
+      buffer=image.slice(0,image.indexOf(',')).includes(';base64') ? Buffer.from(payload,'base64') : Buffer.from(decodeURIComponent(payload));
+    } else if(image.startsWith('/src/assets/') || image.startsWith('/assets/')) {
+      const base=path.resolve(process.cwd(),image.startsWith('/src/') ? 'src/assets' : 'dist/assets');
+      const file=path.resolve(process.cwd(),image.startsWith('/src/') ? image.slice(1) : 'dist'+image);
+      if(file.startsWith(base+path.sep) && fs.existsSync(file))buffer=fs.readFileSync(file);
+    } else {
+      const url=official ? new URL(`${GITHUB_CATALOG_IMAGES_REPO}/${encodeURIComponent(official)}`) : new URL(image);
+      if(url.protocol!=='https:' || url.username || url.password)return null;
+      if(!official){
+        const addresses=await lookup(url.hostname,{all:true});
+        if(!addresses.length || addresses.some(({address})=>/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2[0-9]|3[01])\.|::|f[cd]|fe80)/i.test(address)))return null;
+      }
+      const response=await fetch(url,{signal:AbortSignal.timeout(10000),redirect:'error'});
+      if(!response.ok)return null;
+      buffer=await readResponseBufferLimited(response,10*1024*1024);
     }
-  } catch (err) {
-    console.warn(`[Server] Failed to fetch catalog image ${filename} from GitHub:`, err);
-  }
-  return null;
+    if(!buffer || buffer.length>10*1024*1024)return null;
+    await sharp(buffer).metadata();
+    fs.mkdirSync(CATALOG_IMAGES_CACHE_DIR,{recursive:true});fs.writeFileSync(cachedPath,buffer);
+    return buffer;
+  }catch{return null;}
 }
 
 function bitsToHex(bits: string): string {
@@ -2421,24 +2431,26 @@ async function persistCustomerImage(
   const optimized = await sharp(input, sharpOptions)
     .rotate()
     .flatten({ background: '#ffffff' })
-    .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 85 })
+    .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 94 })
     .toBuffer();
 
-  const fileName = `${crypto.randomUUID()}.jpg`;
+  const fileName = `vision-${crypto.randomUUID()}.jpg`;
+  await fs.promises.writeFile(path.join(IMAGE_AI_DIR,fileName),optimized,{mode:0o600});
   const base64 = optimized.toString('base64');
   const dataUrl = `data:image/jpeg;base64,${base64}`;
 
   customerImageMemoryCache.set(fileName, {
-    buffer: input,
-    mimeType: actualMime,
+    buffer: optimized,
+    mimeType: 'image/jpeg',
     dataUrl,
     createdAt: Date.now(),
   });
   cleanCustomerImageMemoryCache();
 
   // Also sync to GitHub in background if configured, providing an external mirror link
-  syncCustomerImageToGitHub(fileName, optimized).catch(() => {});
+  // Customer images stay in temporary media storage; do not mirror them to a Git repository.
+  void cleanVisionImageLinks(IMAGE_AI_DIR);
 
   return { fileName, mimeType: 'image/jpeg', sizeBytes: optimized.length, dataUrl, buffer: input };
 }
@@ -2508,7 +2520,7 @@ app.post(
       }
       const saved = await persistCustomerImage(req.body, req.get('content-type'));
       return res.status(201).json({
-        imageUrl: saved.dataUrl,
+        imageUrl: customerImagePublicUrl(req,saved.fileName),
         fileName: saved.fileName,
         mimeType: saved.mimeType,
         sizeBytes: saved.sizeBytes,
@@ -2548,7 +2560,7 @@ app.post('/api/ai/customer-images/import', async (req, res) => {
     const image = await readResponseBufferLimited(response, CUSTOMER_IMAGE_MAX_BYTES);
     const saved = await persistCustomerImage(image, response.headers.get('content-type') || undefined);
     return res.status(201).json({
-      imageUrl: saved.dataUrl,
+      imageUrl: customerImagePublicUrl(req,saved.fileName),
       fileName: saved.fileName,
       mimeType: saved.mimeType,
       sizeBytes: saved.sizeBytes,
@@ -2643,7 +2655,7 @@ async function resolveCustomerImageBufferAndInfo(
           try {
             previewBuf = await sharp(rawBuffer)
               .rotate()
-              .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
+              .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
               .jpeg({ quality: 85 })
               .toBuffer();
           } catch {}
@@ -2702,13 +2714,14 @@ const getUploadedCustomerImageFromUrl = (input: string, req: express.Request) =>
 
 async function callPartRecognitionWorker(
   imageUrl: string, fileName: string, prompt: string, catalogSourceUrl?: string,
-  imageBuffer?: Buffer, req?: express.Request
+  imageBuffer?: Buffer, req?: express.Request, publishImage?:ImagePublisher
 ): Promise<any> {
   if (!getPartRecognitionWorkerUrl()) return {success:false,recognition:null};
   try {
     const buffer=imageBuffer?.length ? imageBuffer : (await resolveCustomerImageBufferAndInfo(imageUrl,req!)).buffer;
     const optimized=await sharp(buffer).resize(1600,1600,{fit:'inside',withoutEnlargement:true}).flatten({background:'#ffffff'}).jpeg({quality:94}).toBuffer();
-    const result=await workerVision([{role:'user',parts:[{text:prompt},{inlineData:{mimeType:'image/jpeg',data:optimized.toString('base64')}}]}]);
+    const publisher=publishImage || (req ? createVisionImagePublisher(IMAGE_AI_DIR,visionImagePublicOrigin(req)) : undefined);
+    const result=await workerVision([{role:'user',parts:[{text:prompt},{inlineData:{mimeType:'image/jpeg',data:optimized.toString('base64')}}]}],{publishImage:publisher});
     const recognition=JSON.parse(stripJsonFences(result.text));
     if (!recognition || Array.isArray(recognition) || ![recognition.whatYouSee, recognition.detected_part_type, recognition.visual_shape].some(value=>typeof value==='string' && value.trim())) throw new Error('Invalid visual observation');
     return {success:true, recognition,model:result.model};
@@ -3642,7 +3655,8 @@ async function verifyCandidatesVisuallyWithGemini(
   ai: GoogleGenAI | null,
   userBuffer: Buffer,
   candidates: any[],
-  detectedPartType: string
+  detectedPartType: string,
+  publishImage?:ImagePublisher
 ): Promise<{ matched: any[]; similar: any[]; hasExact: boolean }> {
   if (!candidates || candidates.length === 0) {
     return { matched: [], similar: [], hasExact: false };
@@ -3739,7 +3753,7 @@ ${candidatePrompts}
   try {
     let responseText='';
     if (getPartRecognitionWorkerUrl()) {
-      try { responseText=(await workerVision([{role:'user',parts}])).text; }
+      try { responseText=(await workerVision([{role:'user',parts}],{publishImage})).text; }
       catch { /* The direct key can provide the same comparison if configured. */ }
     }
     if (!responseText && ai) responseText=(await generateWithModelCascade(ai,[{role:'user',parts}],{responseMimeType:'application/json'},'Candidate comparison',GEMINI_MODELS,30000)).text;
@@ -3919,8 +3933,12 @@ function canonicalizeCatalogMatchList(values: unknown): any[] {
 async function analyzePartWithWorker(
   req: express.Request,
   body: any,
-  stage: 'quick' | 'refined'
+  stage: 'quick' | 'refined',
+  onProgress?: (state:ScanProgress)=>void
 ): Promise<any> {
+  refreshRecognitionCatalog();
+  const publishImage=createVisionImagePublisher(IMAGE_AI_DIR,visionImagePublicOrigin(req));
+  void cleanVisionImageLinks(IMAGE_AI_DIR);
   const uploaded = await resolveCustomerImageBufferAndInfo(String(body?.imageUrl || '').trim(), req);
   const prompt = buildWorkerAnalysisPrompt(body, stage);
   const catalogSourceUrl = `${getPublicAppBaseUrl(req)}/api/ai/catalog-source`;
@@ -3937,7 +3955,8 @@ async function analyzePartWithWorker(
         prompt,
         catalogSourceUrl,
         uploaded.buffer,
-        req
+        req,
+        publishImage
       );
       if (workerData && workerData.success === true && workerData.recognition && typeof workerData.recognition === 'object') {
         raw = workerData.recognition;
@@ -4050,8 +4069,27 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
   }
 
 
-  // EXHAUSTIVE SCAN across all real inventory products in src/data/catalogSummary.json:
+  const corpus=buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt);
+  let imageScan:Awaited<ReturnType<typeof scanEveryCatalogImage>>={matches:[],coverage:{total:corpus.length,compared:0,failed:0,complete:false,providerAvailable:false,failedImageIds:[]}};
+  if(aiAvailable){
+    const direct=apiKey ? new GoogleGenAI({apiKey}) : null;
+    imageScan=await scanEveryCatalogImage({query:uploaded.buffer,images:corpus,
+      readImage:image=>getCatalogImageBuffer(image.url,image.revision),progress:onProgress,
+      vision:async parts=>{
+        if(getPartRecognitionWorkerUrl()) {
+          try{return (await workerVision([{role:'user',parts}],{publishImage})).text;}catch(error){if(!direct)throw error;}
+        }
+        if(!direct)throw new Error('No vision provider');
+        return (await generateWithModelCascade(direct,[{role:'user',parts}],{responseMimeType:'application/json'},'Full catalogue image scan',GEMINI_MODELS,45000)).text;
+      }});
+  }
+  // Keep each selected photograph; a family association never becomes a guessed SKU.
   const searchResults = await searchCatalogProducts(uploaded.buffer, raw, prompt);
+  const scannedSkuMatches=imageScan.matches.flatMap(photo=>photo.bindings.filter(binding=>binding.code && inventoryCodes.has(binding.code)).map(binding=>({code:binding.code,image:photo.image,matchedImageId:photo.imageId,similarityScore:photo.score,matchReason:photo.reason,visualVerdict:'very_similar'})));
+  if(imageScan.coverage.complete || imageScan.matches.length) {
+    searchResults.matchedProducts=searchResults.matchedProducts.filter(candidate=>String(raw?.detected_code_on_part || '').trim()===candidate.code && Number(raw?.code_read_confidence)>=90);
+    searchResults.similarCandidates=scannedSkuMatches;
+  } else searchResults.similarCandidates=[...scannedSkuMatches,...searchResults.similarCandidates];
   let exactMatches = canonicalizeCatalogMatchList(searchResults.matchedProducts || []);
   let similarCandidates = canonicalizeCatalogMatchList(searchResults.similarCandidates || [])
     .filter((candidate) => !exactMatches.some((exact) => exact.code === candidate.code));
@@ -4067,7 +4105,7 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
 
   // Visual side-by-side verification with Gemini Vision on all candidate images:
   // "تطبیق تصویر مشتری باتصاویر کاتالوگ اولین اولویت اینه که تصویر را با تصویر مشتری تطبیق بدهد و محصولاتی که نشون میدهد باید شکل و شمایل مشابه خیلی تشابه به تصویر مشتری داشته باشد"
-  if (!isIdenticalFile && (apiKey || getPartRecognitionWorkerUrl()) && uploaded.buffer && uploaded.buffer.length > 0) {
+  if (aiAvailable && !imageScan.coverage.complete && !isIdenticalFile && (apiKey || getPartRecognitionWorkerUrl()) && uploaded.buffer && uploaded.buffer.length > 0) {
     const candidatePool = [...exactMatches, ...similarCandidates].slice(0, 8);
     if (candidatePool.length > 0) {
       try {
@@ -4076,7 +4114,8 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
           ai,
           uploaded.buffer,
           candidatePool,
-          String(raw?.detected_part_type || raw?.visual_shape || 'قطعه صنعتی')
+          String(raw?.detected_part_type || raw?.visual_shape || 'قطعه صنعتی'),
+          publishImage
         );
 
         const vMatched = canonicalizeCatalogMatchList(verifiedResult.matched || []);
@@ -4163,6 +4202,9 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
     fallbackNotice: aiAvailable ? undefined : 'تحلیل آنلاین انجام نشد؛ نتایج فقط پیشنهادهای جست‌وجو هستند. نوشتهٔ روی قطعه و ابعاد برای تأیید لازم است.',
     technicalAdvice: raw?.technical_advice || 'پیش از سفارش، ابعاد، جنس و کد فنی قطعه را با رکورد محصول و شرایط دستگاه تطبیق دهید.',
     customerImageUrl: uploaded.imageUrl,
+    catalogImageMatches:imageScan.matches.slice(0,12).map(photo=>({...photo,image:photo.image.startsWith('data:') ? `${visionImagePublicOrigin(req)}/api/ai/catalog-images/${encodeURIComponent(photo.imageId)}` : photo.image})),
+    scanCoverage:imageScan.coverage,
+    catalogSearchWarning:imageScan.coverage.complete ? undefined : 'بررسی تمام تصاویر کامل نشده است؛ این نتیجه، تأیید بررسی همهٔ کاتالوگ نیست.',
   }, CATALOG_ITEMS as ReturnType<typeof recognitionCatalog>, raw, aiAvailable));
 }
 
@@ -4200,15 +4242,44 @@ async function saveBase64CustomerImageForWorker(
 
   const saved = await persistCustomerImage(buffer, declaredMime);
   return {
-    imageUrl: saved.dataUrl,
+    imageUrl: customerImagePublicUrl(req,saved.fileName),
     fileName: saved.fileName,
   };
 }
+
+app.get('/api/ai/catalog-images/:id',async(req,res)=>{
+  const corpus=buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt);
+  const image=corpus.find(row=>row.id===req.params.id);
+  if(!image)return res.status(404).end();
+  const buffer=await getCatalogImageBuffer(image.url,image.revision);
+  if(!buffer)return res.status(404).end();
+  try{const jpeg=await sharp(buffer).rotate().resize(1200,1200,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:92}).toBuffer();
+    res.setHeader('Cache-Control','public,max-age=60');res.setHeader('X-Content-Type-Options','nosniff');return res.type('image/jpeg').send(jpeg);
+  }catch{return res.status(404).end();}
+});
+const recognitionJobs=new RecognitionJobs<any>();
+app.get('/api/ai/recognition-jobs/:id',(req,res)=>{
+  const job=recognitionJobs.get(req.params.id);
+  if(!job)return res.status(404).json({error:{message:'مهلت نگهداری نتیجه تمام شده است؛ دوباره بررسی کنید.'}});
+  res.setHeader('Cache-Control','no-store');return res.json(job);
+});
 
 // POST: /api/ai/analyze-part
 // stage: 'quick'   = image-only instant identification (step 1)
 //        'refined' = image + dimensions + application (steps 2-3)
 app.post('/api/ai/analyze-part', async (req, res) => {
+  if(req.body?.imageUrl || req.body?.imageBase64){
+    try{
+      const body={...req.body};
+      const jobId=recognitionJobs.start(async progress=>{
+        if(!body.imageUrl){const saved=await saveBase64CustomerImageForWorker(req,body.imageBase64,body.mimeType);body.imageUrl=saved.imageUrl;}
+        const result=await analyzePartWithWorker(req,body,body.stage==='quick' ? 'quick' : 'refined',progress);
+        return publicCatalog(result);
+      });
+      return res.status(202).json({jobId,status:'queued'});
+    }catch{return res.status(429).json({error:{message:'صف بررسی تصاویر پر است؛ کمی بعد دوباره تلاش کنید.'}});}
+  }
+
   refreshRecognitionCatalog();
   const sendJson=res.json.bind(res);
   res.json=((body:any)=>sendJson(body?.summary && Array.isArray(body.matchedProducts) && body.recognitionPolicy !== 'inventory-v1'
@@ -4486,7 +4557,8 @@ ${stageInstruction}
             ai,
             normalizedImage.buffer,
             candidatePool,
-            String(parsedResult?.detectedPartType || parsedResult?.visualShape || 'قطعه صنعتی')
+            String(parsedResult?.detectedPartType || parsedResult?.visualShape || 'قطعه صنعتی'),
+            createVisionImagePublisher(IMAGE_AI_DIR,visionImagePublicOrigin(req))
           );
 
           const vMatched = canonicalizeCatalogMatchList(verifiedResult.matched || []);
