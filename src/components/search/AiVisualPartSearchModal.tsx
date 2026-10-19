@@ -1680,7 +1680,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                 {analysisResult.scanCoverage && (
                   <p role="status" className="text-xs text-slate-600 leading-6 border border-slate-200 rounded-xl p-3">
                     {toPersianDigits(analysisResult.scanCoverage.compared)} از {toPersianDigits(analysisResult.scanCoverage.total)} تصویر با هوش مصنوعی بررسی شد.
-                    {analysisResult.scanCoverage.complete ? " بررسی تمام تصاویر کامل شد." : " بررسی کامل کاتالوگ انجام نشده است؛ نتیجه موقت است."}
+                    {analysisResult.retrieval?.mode==="indexed" ? ` جست‌وجو در ${toPersianDigits(analysisResult.retrieval.indexed)} تصویر ایندکس‌شده؛ ${analysisResult.scanCoverage.complete ? "بازبینی گزینه‌های نزدیک کامل شد." : "بازبینی کامل نشده است."}` : analysisResult.scanCoverage.complete ? " بررسی تمام تصاویر کامل شد." : " بررسی کامل کاتالوگ انجام نشده است؛ نتیجه موقت است."}
                   </p>
                 )}
                 {!!analysisResult.catalogImageMatches?.length && (

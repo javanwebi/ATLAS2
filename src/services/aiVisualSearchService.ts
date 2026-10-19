@@ -88,6 +88,7 @@ export interface AiPartAnalysisResult {
     verifiedCandidateCount?: number; // Legacy count alias; results are ranked, not independently verified by Gemini.
   };
   catalogImageMatches?: CatalogPhotoMatch[];
+  retrieval?:{mode:string;total:number;indexed:number;ready:boolean;verifiedPool:number};
   scanCoverage?: {total:number;compared:number;failed:number;complete:boolean;providerAvailable:boolean;failedImageIds:string[]};
   matchedProducts: MatchedPartItem[];
   rejectedCandidates?: MatchedPartItem[]; // (legacy, kept empty) items rejected as 'different'

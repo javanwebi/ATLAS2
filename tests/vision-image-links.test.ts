@@ -31,7 +31,7 @@ test('both Worker entrypoints download every supplied image link before model co
  for(const file of ['../worker.js','../cloudflare-worker/worker.js']){
   const worker=(await import(file)).default;const original=globalThis.fetch;const downloads:string[]=[];let modelBody:any;
   globalThis.fetch=(async(url,options)=>{
-   if(String(url).startsWith('https://images.example/')){downloads.push(String(url));return new Response(new Uint8Array([1,2,3]),{headers:{'Content-Type':'image/png'}});}
+   if(String(url).startsWith('https://images.example/')){assert.equal(options?.redirect,'manual');downloads.push(String(url));return new Response(new Uint8Array([1,2,3]),{headers:{'Content-Type':'image/png'}});}
    modelBody=JSON.parse(options!.body as string);return new Response('{"candidates":[{"content":{"parts":[{"text":"{\\"picks\\":[]}"}]}}]}',{status:200});
   }) as typeof fetch;
   try{

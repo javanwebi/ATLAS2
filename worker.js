@@ -364,11 +364,11 @@ async function resolveComparisonImage(value) {
   const url=new URL(String(value || ''));
   const host=url.hostname.toLowerCase();
   if(url.protocol!=='https:' || url.username || url.password || host==='localhost' || host.endsWith('.local') || /^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?::|\[?f[cd]|\[?fe[89ab])/i.test(host))throw new Error('Invalid public image URL');
-  const response=await fetch(url,{signal:AbortSignal.timeout(15000),redirect:'error',headers:{Accept:'image/jpeg,image/png,image/webp'}});
-  if(!response.ok)throw new Error('Image URL unavailable');
+  const response=await fetch(url,{signal:AbortSignal.timeout(15000),redirect:'manual',headers:{Accept:'image/jpeg,image/png,image/webp'}});
+  if(!response.ok)throw Object.assign(new Error('Image URL unavailable'),{code:'image_http_'+response.status});
   let mimeType=(response.headers.get('content-type') || '').split(';')[0].toLowerCase();
   if(mimeType==='image/jpg')mimeType='image/jpeg';
-  if(!['image/jpeg','image/png','image/webp'].includes(mimeType))throw new Error('URL did not return an image');
+  if(!['image/jpeg','image/png','image/webp'].includes(mimeType))throw Object.assign(new Error('URL did not return an image'),{code:'image_invalid_mime'});
   if(Number(response.headers.get('content-length') || 0)>10*1024*1024)throw new Error('Image too large');
   const reader=response.body.getReader();const chunks=[];let length=0;
   while(true){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>10*1024*1024){await reader.cancel();throw new Error('Image too large');}chunks.push(value);}
@@ -410,6 +410,27 @@ async function handleMultimodalComparison(body, env, cors) {
     }catch{}
   }
   return errorResponse('vision_unavailable','مدل بینایی در دسترس نیست؛ مقایسه انجام نشده است.',503,cors);
+}
+
+// Each image is embedded separately: never average the entire catalogue into one vector.
+async function handleImageEmbeddings(body,env,cors) {
+ const key=env?.GEMINI_API_KEY;
+ if(!key)return errorResponse('ai_not_configured','کلید هوش مصنوعی ورکر تنظیم نشده است.',503,cors);
+ const parts=(body.messages || []).flatMap(m=>m.content || []).filter(p=>p.type==='image_url');
+ if(!parts.length || parts.length>6)return errorResponse('invalid_image_count','یک تا شش تصویر لازم است.',400,cors);
+ let images;
+ try {images=await Promise.all(parts.map(p=>resolveComparisonImage(p.image_url?.url)));}
+ catch(error){return errorResponse('invalid_image','تصویر قابل دریافت نیست. ('+(error?.code || 'image_fetch_failed')+')',400,cors);}
+ const model='gemini-embedding-2';
+ const response=await fetch(`${GEMINI_API_BASE}/models/${model}:batchEmbedContents`,{
+  method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},signal:AbortSignal.timeout(30000),
+  body:JSON.stringify({requests:images.map(image=>({model:'models/'+model,content:{parts:[{inlineData:image}]},outputDimensionality:768}))})
+ });
+ if(!response.ok)return errorResponse(response.status===429?'rate_limit':'embedding_unavailable','مدل ایندکس تصویری در دسترس نیست.',response.status===429?429:503,cors);
+ const data=await response.json();const vectors=(data.embeddings || []).map(e=>e.values);
+ if(vectors.length!==images.length || vectors.some(v=>!Array.isArray(v) || v.length!==768 || v.some(n=>!Number.isFinite(n))))
+  return errorResponse('embedding_invalid','پاسخ ایندکس معتبر نیست.',503,cors);
+ return jsonResponse({protocol:'atlas-embedding-v1',model,choices:[{message:{role:'assistant',content:JSON.stringify({vectors})}}]},200,cors);
 }
 
 export default {
@@ -471,6 +492,7 @@ export default {
           return errorResponse('invalid_json', 'درخواست باید شامل بدنه معتبر JSON باشد.', 400, cors);
         }
 
+        if(body?.task==='catalog-image-embedding')return handleImageEmbeddings(body,env,cors);
         if(body?.task==='catalog-image-scan')return handleMultimodalComparison(body,env,cors);
 
         // 1. Resolve customer image buffer in base64 from direct base64, data URL or image link

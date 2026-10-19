@@ -1,3 +1,4 @@
+import { CatalogVisualIndex } from './src/services/catalogVisualIndex';
 import { RecognitionServiceError } from './src/services/recognitionErrors';
 import { createVisionImagePublisher, cleanVisionImageLinks, type ImagePublisher } from './src/services/visionImageLinks';
 import { lookup } from 'node:dns/promises';
@@ -563,6 +564,27 @@ console.log(`[Server] Loaded ${CATALOG_ITEMS.length} real inventory SKUs for rec
 const IMAGE_HASH_CACHE_PATH = process.env.IMAGE_HASH_CACHE_PATH || path.join(process.cwd(), 'src', 'data', 'imageHashes.json');
 const GITHUB_CATALOG_IMAGES_REPO = 'https://raw.githubusercontent.com/javanweb/imagesatlas/main';
 const CATALOG_IMAGES_CACHE_DIR = process.env.CATALOG_IMAGES_CACHE_DIR || path.join(process.cwd(), '.cache', 'catalog_images');
+const catalogVisualIndex=new CatalogVisualIndex(process.env.CATALOG_VISUAL_INDEX_PATH || path.join(process.cwd(),'.cache','catalog-visual-index.json'));
+let nextVisualIndexBuild=0;
+async function embedCatalogImages(buffers:Buffer[],publishImage:ImagePublisher):Promise<number[][]>{
+ const parts=buffers.map(buffer=>({inlineData:{mimeType:'image/jpeg',data:buffer.toString('base64')}}));
+ const key=getGeminiKey();
+ if(getPartRecognitionWorkerUrl()){
+  try{return JSON.parse((await workerVision([{role:'user',parts}],{publishImage,task:'catalog-image-embedding'})).text).vectors;}
+  catch(error){if(!key)throw error;}
+ }
+ if(!key)throw new RecognitionServiceError('unavailable');
+ const response=await new GoogleGenAI({apiKey:key}).models.embedContent({model:'gemini-embedding-2',
+  contents:parts.map(part=>({role:'user',parts:[part]})),config:{outputDimensionality:768}});
+ return (response.embeddings || []).map(embedding=>embedding.values || []);
+}
+function warmCatalogVisualIndex(corpus:ReturnType<typeof buildCatalogImageCorpus>,publishImage:ImagePublisher){
+ if(Date.now()<nextVisualIndexBuild)return;
+ nextVisualIndexBuild=Date.now()+60000;
+ void catalogVisualIndex.update(corpus,row=>getCatalogImageBuffer(row.url,row.revision),buffers=>embedCatalogImages(buffers,publishImage))
+ .then(()=>console.log('[Visual index]',JSON.stringify(catalogVisualIndex.coverage(corpus))))
+ .catch(()=>console.warn('[Visual index] Index incomplete; exhaustive comparison remains active.'));
+}
 
 // Ensure catalog images cache folder exists
 try {
@@ -4074,10 +4096,18 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
 
 
   const corpus=buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt);
+  await catalogVisualIndex.load();
+  let comparisonCorpus=corpus;
+  let retrievalMode='exhaustive';
+  try{
+    const retrieved=await catalogVisualIndex.retrieve(uploaded.buffer,corpus,buffers=>embedCatalogImages(buffers,publishImage));
+    if(retrieved){comparisonCorpus=retrieved;retrievalMode='indexed';}
+  }catch{ /* A failed retrieval cannot silently remove catalogue images. */ }
+  warmCatalogVisualIndex(corpus,publishImage);
   let imageScan:Awaited<ReturnType<typeof scanEveryCatalogImage>>={matches:[],coverage:{total:corpus.length,compared:0,failed:0,complete:false,providerAvailable:false,failedImageIds:[]}};
   if(aiAvailable){
     const direct=apiKey ? new GoogleGenAI({apiKey}) : null;
-    imageScan=await scanEveryCatalogImage({query:uploaded.buffer,images:corpus,
+    imageScan=await scanEveryCatalogImage({query:uploaded.buffer,images:comparisonCorpus,
       readImage:image=>getCatalogImageBuffer(image.url,image.revision),progress:onProgress,
       vision:async parts=>{
         if(getPartRecognitionWorkerUrl()) {
@@ -4176,6 +4206,7 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
     customerImageUrl: uploaded.imageUrl,
     catalogImageMatches:imageScan.matches.slice(0,12).map(photo=>({...photo,image:photo.image.startsWith('data:') ? `${visionImagePublicOrigin(req)}/api/ai/catalog-images/${encodeURIComponent(photo.imageId)}` : photo.image})),
     scanCoverage:imageScan.coverage,
+    retrieval:{mode:retrievalMode,...catalogVisualIndex.coverage(corpus),verifiedPool:comparisonCorpus.length},
     catalogSearchWarning:imageScan.coverage.complete ? undefined : 'بررسی تمام تصاویر کامل نشده است؛ این نتیجه، تأیید بررسی همهٔ کاتالوگ نیست.',
   }, CATALOG_ITEMS as ReturnType<typeof recognitionCatalog>, raw, aiAvailable));
 }
@@ -4230,6 +4261,11 @@ app.get('/api/ai/catalog-images/:id',async(req,res)=>{
   }catch{return res.status(404).end();}
 });
 const recognitionJobs=new RecognitionJobs<any>();
+app.get('/api/ai/visual-index-status',async (_req,res)=>{
+ await catalogVisualIndex.load();
+ const corpus=buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt);
+ res.json(catalogVisualIndex.coverage(corpus));
+});
 app.get('/api/ai/recognition-jobs/:id',(req,res)=>{
   const job=recognitionJobs.get(req.params.id);
   if(!job)return res.status(404).json({error:{message:'مهلت نگهداری نتیجه تمام شده است؛ دوباره بررسی کنید.'}});
@@ -6336,3 +6372,9 @@ async function start() {
 }
 
 start();
+
+setTimeout(()=>{
+ const origin=String(process.env.VISION_IMAGE_PUBLIC_ORIGIN || process.env.APP_URL || '').replace(/\/$/,'');
+ if(!origin.startsWith('https://'))return;
+ warmCatalogVisualIndex(buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt),createVisionImagePublisher(IMAGE_AI_DIR,origin));
+},10000).unref();

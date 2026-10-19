@@ -80,13 +80,14 @@ export async function scanEveryCatalogImage(input:{
  // Verify every shortlisted photo individually; batch scores are not calibrated across sheets.
  const selected=[...matches.values()];
  const verified:CatalogPhotoMatch[]=[];
- await boundedWork(selected.length,concurrency,()=>providerAvailable,async i=>{
-  update('verifying');const group=selected.slice(i,i+1);const loaded:CatalogPhotoMatch[]=[];const parts:any[]=[imagePart(user)];
+ await boundedWork(Math.ceil(selected.length/3),concurrency,()=>providerAvailable,async groupIndex=>{
+  const i=groupIndex*3;
+  update('verifying');const group=selected.slice(i,i+3);const loaded:CatalogPhotoMatch[]=[];const parts:any[]=[imagePart(user)];
   for(const candidate of group){const row=input.images.find(r=>r.id===candidate.imageId)!;try{const buffer=await input.readImage(row);if(buffer){const jpg=await sharp(buffer).rotate().resize(1000,1000,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:95}).toBuffer();loaded.push(candidate);parts.push({text:`گزینه ${loaded.length}`},imagePart(jpg));}}catch{}}
   if(!loaded.length){failedImageIds.push(...group.map(c=>c.imageId));return;}
   parts.unshift({text:`عکس اول مشتری است. ${loaded.length} گزینه بعدی را با دقت جزئیات فیزیکی مقایسه کن. برای هر گزینه فقط شباهت قابل مشاهده و تفاوت‌ها را بده، هرگز هویت کد یا سازگاری نصب را از عکس تضمین نکن. ابتدا نوع قطعه و ساختار هر دو عکس را مستقل توصیف کن؛ سپس مقایسه کن. فرق در رنگ یا زاویه به تنهایی رد نیست. تفاوت قطعی در نوع قطعه، تعداد دندانه قابل شمارش، محل سوراخ، توپر یا توخالی بودن، اتصال و پروفیل شیار باعث رد است. اگر جزئیات دیده نمی‌شوند unknown بنویس؛ هرگز آنها را حدس نزن. حداقل دو ویژگی فیزیکی مشخص مشترک لازم است. score احتمال آماری نیست. JSON: {"comparisons":[{"n":1,"similar":true,"score":85,"queryType":"نوع قابل مشاهده","candidateType":"نوع قابل مشاهده","sameType":true,"matchingFeatures":["ویژگی مشخص اول","ویژگی مشخص دوم"],"contradictions":[],"checks":{"geometry":"match","holes":"unknown","teeth":"unknown","connections":"match","markings":"unknown"},"reason":"شباهت‌ها، تفاوت‌ها و موارد نامعلوم"}]}. مقدار هر check فقط match یا mismatch یا unknown. موارد نامرتبط similar:false.`});
   try{
-    const data=parse(await input.vision(parts));if(!Array.isArray(data.comparisons) || data.comparisons.length!==loaded.length)throw new Error('Invalid comparison');
+    const data=parse(await input.vision(parts));if(!Array.isArray(data.comparisons) || data.comparisons.length!==loaded.length || new Set(data.comparisons.map((c:any)=>c.n)).size!==loaded.length)throw new Error('Invalid comparison');
     for(const c of data.comparisons){const n=Number(c.n),score=Number(c.score);if(!hasPhysicalEvidence(c) || !Number.isInteger(n) || n<1 || n>loaded.length || !Number.isFinite(score) || score<80)continue;
       verified.push({...loaded[n-1],score:Math.min(99,score),reason:String(c.reason || loaded[n-1].reason).slice(0,800)});}
   }catch{providerAvailable=false;}

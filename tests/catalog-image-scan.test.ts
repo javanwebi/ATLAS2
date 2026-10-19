@@ -87,3 +87,22 @@ test('job API preserves controlled configuration errors but hides unknown provid
  assert.ok(jobs.get(auth)?.error?.includes('APP_WORKER_TOKEN'));
  assert.ok(!jobs.get(unknown)?.error?.includes('private-provider-value'));
 });
+test('embedding transport preserves separate vectors for catalogue images and never aggregates a batch',async()=>{
+ const original=globalThis.fetch;
+ try{
+  for(const file of ['../worker.js','../cloudflare-worker/worker.js']){
+   let requests:any[]=[];
+   globalThis.fetch=(async(_url,init)=>{
+    const body=JSON.parse(String(init?.body));requests=body.requests;
+    return new Response(JSON.stringify({embeddings:requests.map((_,i)=>({values:Array.from({length:768},(__,j)=>j===i?1:0)}))}),{status:200});
+   }) as typeof fetch;
+   const worker=(await import(file)).default;
+   const request=new Request('https://worker.example/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:JSON.stringify({task:'catalog-image-embedding',messages:[{content:[1,2].map(()=>({type:'image_url',image_url:{url:'data:image/png;base64,YQ=='}}))}]})});
+   const response=await worker.fetch(request,{APP_WORKER_TOKEN:'fixture',GEMINI_API_KEY:'fixture'});
+   assert.equal(response.status,200);assert.equal(requests.length,2);
+   assert.equal(requests[0].content.parts.length,1);
+   const data=await response.json();const vectors=JSON.parse(data.choices[0].message.content).vectors;
+   assert.equal(vectors.length,2);assert.equal(vectors[0][0],1);assert.equal(vectors[1][1],1);
+  }
+ }finally{globalThis.fetch=original;}
+});
