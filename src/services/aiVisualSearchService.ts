@@ -68,7 +68,7 @@ export interface MatchedPartItem {
 }
 
 export interface ImageScanProgress {stage:'preparing'|'scanning'|'verifying'|'complete';total:number;compared:number;failed:number;}
-export interface CatalogPhotoMatch {imageId:string;image:string;label:string;score:number;reason:string;bindings:{familyCode:string;code?:string;verified:boolean}[];}
+export interface CatalogPhotoMatch {imageId:string;image:string;label:string;score:number;reason:string;relation?:'very_similar'|'related';familyNames?:string[];bindings:{familyCode:string;code?:string;verified:boolean}[];}
 export interface AiPartAnalysisResult {
   success: boolean;
   isAiGenerated: boolean;
@@ -76,6 +76,9 @@ export interface AiPartAnalysisResult {
   model?: string;
   summary: {
     whatYouSee?: string;
+    readableMarkings?:string[];
+    observedSpecifications?:{name:string;value:string;evidence:string;source:string}[];
+    unknownParameters?:string[];
     detectedPartType: string;
     partFamilyFarsi?: string; // short part family, e.g. «چرخ‌دهنده» — used for dynamic UI titles
     detectedProfile: string;

@@ -1677,6 +1677,8 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                   </div>
                 )}
 
+                {!!analysisResult.summary.readableMarkings?.length && <p className="text-xs leading-6 text-slate-600">نوشته‌های خوانده‌شده: {analysisResult.summary.readableMarkings.join(" · ")}</p>}
+                {!!analysisResult.summary.observedSpecifications?.length && <div className="grid grid-cols-2 gap-2">{analysisResult.summary.observedSpecifications.map((spec,i)=><div key={i} className="rounded-xl border border-slate-200 p-3 text-xs"><span className="text-slate-500">{spec.name}: </span><span dir="auto">{spec.value}</span><p className="text-slate-400 mt-1">خوانده‌شده از نوشتهٔ تصویر</p></div>)}</div>}
                 {analysisResult.scanCoverage && (
                   <p role="status" className="text-xs text-slate-600 leading-6 border border-slate-200 rounded-xl p-3">
                     {toPersianDigits(analysisResult.scanCoverage.compared)} از {toPersianDigits(analysisResult.scanCoverage.total)} تصویر با هوش مصنوعی بررسی شد.
@@ -1691,6 +1693,8 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                         <article key={photo.imageId} className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
                           <img src={photo.image} alt={photo.label} className="w-full h-36 object-contain" loading="lazy" />
                           <p className="text-xs font-bold text-slate-700">{photo.label}</p>
+                          <p className="text-xs text-orange-700">{photo.relation==="related" ? "هم‌خانواده؛ دارای تفاوت" : "شباهت بصری بیشتر"}</p>
+                          {!!photo.familyNames?.length && <p className="text-xs text-slate-600">خانواده: {photo.familyNames.join("، ")}</p>}
                           <p className="text-xs leading-6 text-slate-500">{photo.reason}</p>
                           {photo.bindings.some(binding=>binding.code) && !photo.bindings.some(binding=>binding.verified) && <p className="text-xs text-slate-500">کدهای متصل به عکس؛ تعلق دقیق تصویر به این کدها هنوز تأیید نشده است.</p>}
                           {[...new Set(photo.bindings.flatMap(binding=>binding.code ? [binding.code] : []))].map(code=>(
