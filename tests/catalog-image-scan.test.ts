@@ -20,7 +20,7 @@ test('corpus contains all 869 unbound official images and every admin variant ph
 });
 test('all 869 photos reach vision and a hit in the final batch survives full-resolution verification',async()=>{
  const image=await photo();const images=buildCatalogImageCorpus([]).map(r=>({...r,id:'test-'+r.id,revision:'fixture-869'}));let scanned=0;
- const result=await scanEveryCatalogImage({query:image,images,readImage:async()=>image,vision:async parts=>{
+ const result=await scanEveryCatalogImage({query:image,images,concurrency:1,readImage:async()=>image,vision:async parts=>{
    const prompt=parts[0].text;
    if(prompt.includes('عکس اول مشتری است.'))return JSON.stringify({comparisons:[{n:1,similar:true,score:93,reason:'final item checked',queryType:'gear',candidateType:'gear',sameType:true,matchingFeatures:['helical teeth','central bore'],contradictions:[],checks:{geometry:'match',holes:'match',teeth:'unknown',connections:'unknown',markings:'unknown'}}]});
    const count=Number(prompt.match(/شامل (\d+)/)[1]);scanned+=count;
@@ -68,4 +68,22 @@ test('physical contradictions and unsupported confidence fail closed',()=>{
  assert.equal(hasPhysicalEvidence({...evidence,contradictions:['straight teeth instead of helical']}),false);
  assert.equal(hasPhysicalEvidence({similar:true,score:99}),false);
  assert.equal(hasPhysicalEvidence({...evidence,matchingFeatures:['round','round']}),false);
+});
+
+test('scan overlaps independent vision requests with a strict concurrency bound',async()=>{
+ const image=await photo();const images=buildCatalogImageCorpus([]).slice(0,8).map(r=>({...r,id:'parallel-'+r.id}));
+ let active=0,peak=0;
+ const result=await scanEveryCatalogImage({query:image,images,batchSize:1,concurrency:3,readImage:async()=>image,vision:async()=>{
+  peak=Math.max(peak,++active);await new Promise(resolve=>setTimeout(resolve,15));active--;return '{"picks":[]}';
+ }});
+ assert.equal(result.coverage.compared,8);assert.equal(result.coverage.complete,true);assert.ok(peak>1 && peak<=3);
+});
+test('job API preserves controlled configuration errors but hides unknown provider details',async()=>{
+ const {RecognitionServiceError}=await import('../src/services/recognitionErrors');
+ const jobs=new RecognitionJobs();
+ const auth=jobs.start(async()=>{throw new RecognitionServiceError('worker_auth');});
+ const unknown=jobs.start(async()=>{throw new Error('private-provider-value');});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.ok(jobs.get(auth)?.error?.includes('APP_WORKER_TOKEN'));
+ assert.ok(!jobs.get(unknown)?.error?.includes('private-provider-value'));
 });

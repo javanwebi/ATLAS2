@@ -1,3 +1,4 @@
+import { RecognitionServiceError } from './recognitionErrors';
 import type { ImagePublisher } from './visionImageLinks';
 import { recognitionWorkerUrl } from '../utils/recognitionPolicy';
 
@@ -29,7 +30,13 @@ export async function workerVision(contents: any[], options: {
     method:'POST',headers,signal:AbortSignal.timeout(timeout),
     body:JSON.stringify({task:'catalog-image-scan',messages,model:env.PART_RECOGNITION_MODEL || undefined,response_format:{type:'json_object'}}),
   });
-  if(!response.ok)throw new Error(`Recognition Worker HTTP ${response.status}`);
+  if(!response.ok){
+    const detail=await response.json().catch(()=>null);
+    const type=detail?.error?.type;
+    throw new RecognitionServiceError(response.status===401 || response.status===403 ? 'worker_auth'
+      : type==='ai_not_configured' ? 'provider_key' : type==='invalid_image' ? 'image_unreachable'
+      : response.status===429 ? 'rate_limit' : 'unavailable');
+  }
   const data=await response.json();
   if(contents.flatMap(turn=>turn.parts || []).filter(part=>part.inlineData).length>1 && data.recognition)throw new Error('Worker upgrade required: multiple images were not compared');
   const raw=data.recognition || data.choices?.[0]?.message?.content;

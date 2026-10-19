@@ -94,3 +94,11 @@ test('Workers reject requests without a configured access secret, even with a pr
   assert.equal(response.status,401);
  }
 });
+
+test('Worker authentication, missing provider key and inaccessible images have actionable safe errors',async()=>{
+ for(const [status,type,expected] of [[401,'unauthorized','APP_WORKER_TOKEN'],[503,'ai_not_configured','GEMINI_API_KEY'],[400,'invalid_image','HTTPS']]){
+  await assert.rejects(()=>workerVision([],{env:{},fetch:async()=>new Response(JSON.stringify({error:{type,message:'provider-private-detail'}}),{status:Number(status)})}),error=>{
+   assert.ok(error instanceof Error);assert.ok(error.message.includes(String(expected)));assert.ok(!error.message.includes('provider-private-detail'));return true;
+  });
+ }
+});

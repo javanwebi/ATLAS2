@@ -1,3 +1,4 @@
+import { RecognitionServiceError } from './src/services/recognitionErrors';
 import { createVisionImagePublisher, cleanVisionImageLinks, type ImagePublisher } from './src/services/visionImageLinks';
 import { lookup } from 'node:dns/promises';
 import { buildCatalogImageCorpus, officialImageFile } from './src/services/catalogImageCorpus';
@@ -2727,7 +2728,7 @@ async function callPartRecognitionWorker(
     return {success:true, recognition,model:result.model};
   } catch (error:any) {
     console.warn('[Recognition Worker]',error?.name || 'unavailable');
-    return {success:false,recognition:null};
+    throw error;
   }
 }
 
@@ -3945,6 +3946,7 @@ async function analyzePartWithWorker(
 
   let raw: any = null;
   let workerModel = 'Atlas Hybrid AI Vision Engine';
+  let recognitionFailure:unknown;
 
   // Worker is always attempted before a direct provider key.
   if (!raw || Object.keys(raw).length === 0) {
@@ -3963,7 +3965,8 @@ async function analyzePartWithWorker(
         workerModel = workerData.model || 'Worker Vision';
       }
     } catch (err: any) {
-      console.warn('[AI Search Worker] Call exception:', err?.message);
+      recognitionFailure=err;
+      console.warn('[AI Search Worker] Call exception:', err?.name);
     }
   }
 
@@ -4053,6 +4056,7 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
   }
 
   const aiAvailable = Boolean(raw && Object.keys(raw).length);
+  if(!aiAvailable)throw recognitionFailure instanceof RecognitionServiceError ? recognitionFailure : new RecognitionServiceError('unavailable');
   // 3. Fallback baseline if all networks are down
   if (!raw || typeof raw !== 'object' || Object.keys(raw).length === 0) {
     raw = {
@@ -4084,7 +4088,7 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
       }});
   }
   // Keep each selected photograph; a family association never becomes a guessed SKU.
-  const searchResults = await searchCatalogProducts(uploaded.buffer, raw, prompt);
+  const searchResults: {matchedProducts:any[];similarCandidates:any[];exactVisualMatch:boolean} = {matchedProducts:[],similarCandidates:[],exactVisualMatch:false};
   const scannedSkuMatches=imageScan.matches.flatMap(photo=>photo.bindings.filter(binding=>binding.code && inventoryCodes.has(binding.code)).map(binding=>({code:binding.code,image:photo.image,matchedImageId:photo.imageId,similarityScore:photo.score,matchReason:photo.reason,visualVerdict:'very_similar'})));
   // Never reintroduce unverified hash/text suggestions when the image scan fails.
   searchResults.matchedProducts=[];

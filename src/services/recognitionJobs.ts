@@ -1,3 +1,4 @@
+import { RecognitionServiceError } from './recognitionErrors';
 import { randomUUID } from 'node:crypto';
 import type { ScanProgress } from './exhaustiveImageScan';
 export class RecognitionJobs<T> {
@@ -14,6 +15,6 @@ export class RecognitionJobs<T> {
  private pump(){for(const [id,job] of this.jobs){if(this.active>=this.concurrency)break;if(job.status!=='queued')continue;
   job.status='running';this.active++;
   const run=job.run!;
-  Promise.resolve().then(()=>run(value=>{job.progress=value;})).then(result=>{job.result=result;job.status='complete';},()=>{job.error='بررسی کامل تصاویر انجام نشد؛ لطفاً دوباره تلاش کنید.';job.status='failed';}).finally(()=>{delete job.run;job.expires=Date.now()+this.ttl;this.active--;this.pump();});
+  Promise.resolve().then(()=>run(value=>{job.progress=value;})).then(result=>{job.result=result;job.status='complete';},(error)=>{job.error=error instanceof RecognitionServiceError ? error.message : 'بررسی کامل تصاویر انجام نشد؛ لطفاً دوباره تلاش کنید.';job.status='failed';}).finally(()=>{delete job.run;job.expires=Date.now()+this.ttl;this.active--;this.pump();});
  }}
 }
