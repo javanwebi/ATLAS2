@@ -44,11 +44,14 @@ import prodPumpImg from './mobile/prod_pump_1789640002577.webp';
 import prodMotorImg from './mobile/prod_motor_1789640017545.webp';
 import prodBearingNskImg from './mobile/prod_bearing_nsk_1789640036345.webp';
 import footerConveyorImg from './mobile/footer_conveyor_1789463035125.webp';
-import atlasAiCyborgImg from './atlas_ai_cyborg_1790503754467.jpg';
-import aiForzaCyborgImg from './ChatGPT Image Sep 28, 2026, 09_25_15 AM.png';
-import chatGptForzaImg from './ChatGPT Image Sep 28, 2026, 09_25_15 AM.png';
+import forzaAiRobotHaloImg from '../IMAGESITE/Futuristic FORZA AI Robot Halo.png';
+import levitatingOrbitalEngineImg from '../IMAGESITE/Levitating Orbital Engine Assembly (1).png';
 import refineryDuskWideImg from './refinery_dusk_wide_1790695808002.jpg';
-import aiForzaDesktopCinematicImg from './ai_forza_desktop_cinematic_1790695825646.jpg';
+
+const atlasAiCyborgImg = forzaAiRobotHaloImg;
+const aiForzaCyborgImg = forzaAiRobotHaloImg;
+const chatGptForzaImg = forzaAiRobotHaloImg;
+const aiForzaDesktopCinematicImg = levitatingOrbitalEngineImg;
 import authIndustrialHeroImg from './auth_industrial_hero_1791191790536.jpg';
 import bannerAuthLoginImg from './banner_auth_login_1791194148886.jpg';
 import bannerAuthRegisterImg from './banner_auth_register_1791194168672.jpg';
@@ -100,6 +103,8 @@ export const STORE_ASSETS = {
   heroBanner: heroBannerImg,
   heroPulley: atlasHeroPulleyImg,
   heroSteelCoils: heroSteelCoilsImg,
+  forzaAiRobotHalo: forzaAiRobotHaloImg,
+  levitatingOrbitalEngine: levitatingOrbitalEngineImg,
   aiCyborgHero: atlasAiCyborgImg,
   aiForzaCyborg: aiForzaCyborgImg,
   aiForzaDesktopCinematic: aiForzaDesktopCinematicImg,

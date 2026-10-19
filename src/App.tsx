@@ -161,19 +161,19 @@ export default function App() {
                     {/* Dedicated Tile & Ceramic Industry Page */}
                     <Route
                       path="/category/ceramic-tiles"
-                      element={<IndustryPage />}
+                      element={<TileCeramicIndustryPage />}
                     />
                     <Route
                       path="/industries/ceramic"
-                      element={<IndustryPage />}
+                      element={<TileCeramicIndustryPage />}
                     />
                     <Route
                       path="/industries/tile-ceramic"
-                      element={<IndustryPage />}
+                      element={<TileCeramicIndustryPage />}
                     />
                     <Route
                       path="/industry/ceramic-tile"
-                      element={<IndustryPage />}
+                      element={<TileCeramicIndustryPage />}
                     />
 
                     {/* 2. Category Listing */}

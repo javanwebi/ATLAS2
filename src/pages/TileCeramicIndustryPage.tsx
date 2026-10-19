@@ -1,1619 +1,1615 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Flame,
-  ShieldCheck,
-  Zap,
-  Layers,
-  Settings,
-  Truck,
-  PhoneCall,
-  CheckCircle2,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Calculator,
-  Sparkles,
-  Thermometer,
-  Factory,
   Search,
-  AlertCircle,
-  HelpCircle,
-  Package,
-  Wrench,
-  Bot,
-  Sliders,
-  Send,
-  MessageCircle,
+  MessageSquare,
+  ShieldCheck,
   Clock,
-  Building,
+  HelpCircle,
   RefreshCw,
-  Cpu,
+  Play,
+  Camera,
+  Upload,
+  SlidersHorizontal,
+  ClipboardList,
+  ChevronLeft,
+  CheckCircle2,
+  Heart,
+  Info,
+  X,
+  FileText,
+  Factory,
+  Layers,
   Award,
-  Building2,
-  History,
-  FileCheck2,
-  Warehouse,
-  MapPin,
+  Sparkles,
+  Wrench,
+  ArrowLeft,
 } from 'lucide-react';
 import { STORE_ASSETS } from '../assets/images';
-import { toPersianDigits } from '../utils/formatters';
+import { getProductImageUrl } from '../assets/imagesproducts';
+import { PartIdentificationLink } from '../components/search/PartIdentificationProvider';
+import { useWishlist } from '../context/WishlistContext';
 
-// Types for Ceramic Products
-interface CeramicProductItem {
+interface StageSubPart {
   id: string;
-  name: string;
-  code: string;
-  subTitle: string;
-  category: 'kiln' | 'press' | 'glaze' | 'sorting' | 'milling' | 'all';
-  categoryLabel: string;
-  tempRating: string;
-  inStock: boolean;
+  title: string;
   image: string;
-  badge?: string;
-  keySpecs: { label: string; value: string }[];
-  applications: string;
+  fallbackImage: string;
+  query: string;
 }
 
-// Tile Production Plant Stage
-interface PlantStage {
+interface ProductionStage {
   id: string;
-  stageNumber: string;
+  number: string;
+  shortLabel: string;
+  badgeLabel?: string;
   title: string;
-  englishTitle: string;
   description: string;
-  criticalChallenge: string;
-  sanatPishSolution: string;
-  criticalParts: string[];
-  icon: React.ElementType;
+  details: string;
   image: string;
+  hotspotX: string; // percentage from left
+  hotspotY: string; // percentage from top
+  query: string;
+  popularParts: StageSubPart[];
+}
+
+interface ProblemItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  symptom: string;
+  cause: string;
+  solution: string;
+  recommendedQuery: string;
+}
+
+interface RecommendedProductItem {
+  code: string;
+  name: string;
+  subtitle: string;
+  spec: string;
+  image: string;
+  fallbackImage: string;
+  query: string;
 }
 
 export const TileCeramicIndustryPage: React.FC = () => {
-  // Scroll progress for vertical indicator
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const navigate = useNavigate();
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const total = document.documentElement.scrollHeight - window.innerHeight;
-      if (total > 0) {
-        setScrollProgress(Math.min(1, Math.max(0, window.scrollY / total)));
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Interactive Stage State (Default 'press' = stage 05 as shown in reference design)
+  const [activeStageId, setActiveStageId] = useState<string>('press');
 
-  // ---------------------------------------------------------------------------
-  // 1. FILTERING & SEARCH STATE
-  // ---------------------------------------------------------------------------
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  // Smart Search Input States
+  const [techSpecQuery, setTechSpecQuery] = useState<string>('');
+  const [machineProblemQuery, setMachineProblemQuery] = useState<string>('');
 
-  // ---------------------------------------------------------------------------
-  // 2. ACTIVE FACTORY STAGE IN MAP
-  // ---------------------------------------------------------------------------
-  const [activeStageId, setActiveStageId] = useState<string>('kiln');
-
-  // ---------------------------------------------------------------------------
-  // 3. FULL-SCREEN AI CERAMIC WORKSTATION STATE
-  // ---------------------------------------------------------------------------
-  const [aiTab, setAiTab] = useState<'advisor' | 'troubleshooter'>('advisor');
-
-  // AI Roller Advisor Inputs
-  const [aiTileType, setAiTileType] = useState<string>('porcelain_slab');
-  const [aiKilnTemp, setAiKilnTemp] = useState<number>(1240);
-  const [aiRollerDiameter, setAiRollerDiameter] = useState<number>(50); // 40mm to 65mm
-  const [aiLineSpeed, setAiLineSpeed] = useState<number>(20); // 10 to 35 m/min
-  const [aiKilnWidth, setAiKilnWidth] = useState<number>(3.1); // 2.2 to 3.8m
-
-  // AI Troubleshooter State
-  const [selectedDefectId, setSelectedDefectId] = useState<string>('defect_roller_break');
-
-  // ---------------------------------------------------------------------------
-  // 4. QUICK RFQ INQUIRY MODAL STATE
-  // ---------------------------------------------------------------------------
+  // Modals State
   const [rfqModalOpen, setRfqModalOpen] = useState<boolean>(false);
-  const [rfqItem, setRfqItem] = useState<string>('رولر سرامیکی آلومینایی کوره پخت AL70/80');
-  const [rfqName, setRfqName] = useState<string>('');
+  const [rfqItemName, setRfqItemName] = useState<string>('');
+  const [rfqCustomerName, setRfqCustomerName] = useState<string>('');
   const [rfqPhone, setRfqPhone] = useState<string>('');
-  const [rfqPlantName, setRfqPlantName] = useState<string>('');
+  const [rfqFactory, setRfqFactory] = useState<string>('');
   const [rfqNote, setRfqNote] = useState<string>('');
-  const [rfqSuccess, setRfqSuccess] = useState<boolean>(false);
+  const [rfqSubmitted, setRfqSubmitted] = useState<boolean>(false);
+
+  const [selectedProblem, setSelectedProblem] = useState<ProblemItem | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState<boolean>(false);
+  const [stageInfoModalOpen, setStageInfoModalOpen] = useState<boolean>(false);
 
   // ---------------------------------------------------------------------------
-  // DATA: PLANT STAGES (کجا به کار می‌آییم؟)
+  // 7 STAGES OF TILE & CERAMIC PRODUCTION LINE (01 to 07, Right to Left)
   // ---------------------------------------------------------------------------
-  const plantStages: PlantStage[] = [
+  const productionStages: ProductionStage[] = [
     {
-      id: 'milling',
-      stageNumber: '۰۱',
-      title: 'آماده‌سازی مواد و اسپری درایر',
-      englishTitle: 'Milling & Spray Dryer',
-      description: 'آسیاب بالمیل، پمپ‌های پیستونی دوغاب و خشک‌کن پاششی (اسپری درایر) جهت تولید گرانول یکنواخت تحت فشار و دمای بالا.',
-      criticalChallenge: 'سایش شدید ناشی از اصطکاک دوغاب سیلیسی، فرسایش نازل‌های پاشش و خرابی زودهنگام کاسه‌نمدهای پمپ.',
-      sanatPishSolution: 'تأمین نازل‌های سرامیکی SiSiC کاربید سیلیکون با سختی ۹ موهس و تسمه‌های انتقال قدرت مقاوم به رطوبت و روغن.',
-      criticalParts: ['نازل سرامیکی کاربید سیلیکون اسپری درایر', 'بلبرینگ‌های سنگین بالمیل', 'تسمه‌های V-Belt پمپ دوغاب', 'پکینگ‌های سیل هیدرولیک'],
-      icon: Factory,
-      image: STORE_ASSETS.products.ceramicParts,
+      id: 'raw-material',
+      number: '01',
+      shortLabel: 'آماده‌سازی مواد اولیه',
+      title: 'آماده‌سازی و توزین مواد اولیه',
+      description: 'انتقال خاک، فلدسپات و سیلیس از سیلوها به سیستم توزین با تسمه‌های نقاله مقاوم به سایش و رولیک‌های ضربه‌گیر.',
+      details:
+        'در ابتدای خط تولید کاشی و سرامیک، بارگیری و توزین دقیق مواد معدنی ساینده نیازمند تسمه نقاله‌های لاستیکی چندلایه EP، رولیک‌های ضربه‌گیر لاستیکی، یاتاقان‌های ضد گردوغبار و زنجیرهای انتقال قدرت سنگین است.',
+      image: STORE_ASSETS.industries.ceramic,
+      hotspotX: '90%',
+      hotspotY: '48%',
+      query: 'تسمه نقاله',
+      popularParts: [
+        {
+          id: 'rm-1',
+          title: 'تسمه نقاله',
+          image: getProductImageUrl('e(859).png'),
+          fallbackImage: STORE_ASSETS.products.pvcBelt,
+          query: 'نوار نقاله',
+        },
+        {
+          id: 'rm-2',
+          title: 'رولیک و چرخ',
+          image: getProductImageUrl('e(394).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicRoller,
+          query: 'چرخ',
+        },
+        {
+          id: 'rm-3',
+          title: 'بلبرینگ و یاتاقان',
+          image: getProductImageUrl('e(383).png'),
+          fallbackImage: STORE_ASSETS.products.bearing,
+          query: 'بلبرینگ',
+        },
+        {
+          id: 'rm-4',
+          title: 'ضربه‌گیر لاستیکی',
+          image: getProductImageUrl('e(817).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'ضربه گیر',
+        },
+      ],
+    },
+    {
+      id: 'spray-dryer',
+      number: '02',
+      shortLabel: 'اسپری درایر',
+      badgeLabel: '+20',
+      title: 'بالمیل و خشک‌کن پاششی (اسپری درایر)',
+      description: 'پمپاژ دوغاب سرامیک با فشار بالا و تبدیل به گرانول یکنواخت توسط نازل‌های ضدسایش و تسمه‌های انتقال نیرو.',
+      details:
+        'در واحد بالمیل و اسپری درایر، سایش شدید دوغاب سیلیسی و دمای خشک‌کن چالش اصلی است. پولی‌های چدنی بالانس‌شده، تسمه‌های V-Belt قدرتمند، قطعات پمپ و اورینگ‌های نسوز پایداری این مرحله را تضمین می‌کنند.',
+      image: STORE_ASSETS.industries.bgPlant,
+      hotspotX: '76%',
+      hotspotY: '44%',
+      query: 'پمپ',
+      popularParts: [
+        {
+          id: 'sd-1',
+          title: 'قطعات پمپ',
+          image: getProductImageUrl('e(570).png'),
+          fallbackImage: STORE_ASSETS.products.pump,
+          query: 'پمپ',
+        },
+        {
+          id: 'sd-2',
+          title: 'پولی و کوپلینگ',
+          image: getProductImageUrl('e(165).png'),
+          fallbackImage: STORE_ASSETS.products.aluPulley,
+          query: 'پولی',
+        },
+        {
+          id: 'sd-3',
+          title: 'تسمه V-Belt',
+          image: STORE_ASSETS.categories.belts,
+          fallbackImage: STORE_ASSETS.products.forzaBelt,
+          query: 'تسمه',
+        },
+        {
+          id: 'sd-4',
+          title: 'اورینگ و آب‌بندی',
+          image: getProductImageUrl('e(648).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'اورینگ',
+        },
+      ],
+    },
+    {
+      id: 'final-milling',
+      number: '03',
+      shortLabel: 'آسیاب نهایی',
+      title: 'آسیاب نهایی و الک ویبره گرانول',
+      description: 'همگن‌سازی ذرات پودر گرانول و جداسازی ناخالصی‌ها پیش از ورود به سیلوهای تغذیه پرس.',
+      details:
+        'الک‌های ویبره و خطوط انتقال گرانول نیازمند فنرهای صنعتی، ضربه‌گیرهای لاستیکی دو سر پیچ، توری‌های صنعتی مقاوم و بوش‌های تفلونی ضدسایش هستند تا جریان یکنواخت پودر به سمت پرس حفظ شود.',
+      image: STORE_ASSETS.industries.manufacturing,
+      hotspotX: '62%',
+      hotspotY: '38%',
+      query: 'توری صنعتی',
+      popularParts: [
+        {
+          id: 'fm-1',
+          title: 'ضربه‌گیر صنعتی',
+          image: getProductImageUrl('e(820).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'ضربه گیر',
+        },
+        {
+          id: 'fm-2',
+          title: 'توری و الک',
+          image: getProductImageUrl('e(337).png'),
+          fallbackImage: STORE_ASSETS.categories.ceramic,
+          query: 'توری صنعتی',
+        },
+        {
+          id: 'fm-3',
+          title: 'بوش تفلونی',
+          image: getProductImageUrl('e(219).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'بوش تفلونی',
+        },
+        {
+          id: 'fm-4',
+          title: 'فنر صنعتی',
+          image: getProductImageUrl('e(1).png'),
+          fallbackImage: STORE_ASSETS.forzaSubFittings,
+          query: 'فنر',
+        },
+      ],
+    },
+    {
+      id: 'dryer',
+      number: '04',
+      shortLabel: 'خشک‌کن',
+      title: 'خشک‌کن سریع عمودی و افقی',
+      description: 'رطوبت‌گیری کنترل‌شده بیسکویت خام کاشی پس از پرس با حرکت پیوسته سبدها، زنجیرها و رولیک‌های نسوز.',
+      details:
+        'در خشک‌کن‌های عمودی و افقی، رطوبت بالا و دمای متناوب باعث فرسایش سریع قطعات متحرک می‌شود. چرخ‌دنده‌های دقیق، زنجیرهای صنعتی، بوش‌های داخل رولر و بلبرینگ‌های دورنگهدارنده از توقف خشک‌کن جلوگیری می‌کنند.',
+      image: STORE_ASSETS.industries.ceramic,
+      hotspotX: '47%',
+      hotspotY: '35%',
+      query: 'بوش داخل رولر',
+      popularParts: [
+        {
+          id: 'dr-1',
+          title: 'بوش داخل رولر',
+          image: getProductImageUrl('e(168).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicRoller,
+          query: 'بوش داخل رولر',
+        },
+        {
+          id: 'dr-2',
+          title: 'چرخ‌دنده صنعتی',
+          image: getProductImageUrl('e(549).png'),
+          fallbackImage: STORE_ASSETS.categories.chains,
+          query: 'چرخ دنده',
+        },
+        {
+          id: 'dr-3',
+          title: 'انگشتی رولر',
+          image: getProductImageUrl('e(198).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'انگشتی رولر',
+        },
+        {
+          id: 'dr-4',
+          title: 'بلبرینگ نسوز',
+          image: getProductImageUrl('e(383).png'),
+          fallbackImage: STORE_ASSETS.products.bearing,
+          query: 'بلبرینگ',
+        },
+      ],
     },
     {
       id: 'press',
-      stageNumber: '۰۲',
-      title: 'پرس هیدرولیک سنگین و قالب‌گیری',
-      englishTitle: 'Heavy Hydraulic Press',
-      description: 'شکل‌دهی گرانول با فشارهای سنگین ۳۰۰۰ تا ۷۵۰۰ تن جهت تولید بیسکویت متراکم کاشی، پرسلان و اسلب‌های عریض.',
-      criticalChallenge: 'ضربه و گشتاورهای کوبشی ناگهانی، لرزش شفت و توقف پرهزینه پمپ‌های هیدرولیک ناشی از بالانس نبودن فلکه‌ها.',
-      sanatPishSolution: 'پولی‌های چدنی دانه ریز GG25 با بالانس دینامیکی کلاس Q 6.3 و سیستم اتصال بوش مخروطی Taper Lock جهت تعویض فوری بدون آسیب به شفت.',
-      criticalParts: ['پولی‌های چدنی سنگین GG25', 'بوش مخروطی Taper Lock', 'تسمه‌های شیاردار انتقال گشتاور', 'کوپلینگ‌های انعطاف‌پذیر چدنی'],
-      icon: Settings,
-      image: STORE_ASSETS.products.aluPulley,
+      number: '05',
+      shortLabel: 'پرس و شکل‌دهی',
+      title: 'پرس و شکل‌دهی',
+      description: 'انتقال و موقعیت‌دهی بدنه کاشی، قطعات مکانیکی و لاستیکی مقاوم در برابر سایش و فشار',
+      details:
+        'در بخش پرس هیدرولیک و خطوط تغذیه و خروج بیسکویت خام، شوک‌های مکانیکی، گردوغبار پودر گرانول و نیاز به هم‌راستایی دقیق کاشی اهمیت حیاتی دارد. استفاده از پولی و کوپلینگ‌های بالانس‌شده، قطعات لاستیکی ضدسایش، رولیک و چرخ‌های روکش پلی‌یورتان و تسمه‌های انتقال دقیق، راندمان خط پرس را تضمین می‌کند.',
+      image: STORE_ASSETS.industries.ceramic,
+      hotspotX: '35%',
+      hotspotY: '35%',
+      query: 'پولی',
+      popularParts: [
+        {
+          id: 'pr-1',
+          title: 'پولی و کوپلینگ',
+          image: STORE_ASSETS.categories.pulleys,
+          fallbackImage: STORE_ASSETS.products.aluPulley,
+          query: 'پولی',
+        },
+        {
+          id: 'pr-2',
+          title: 'قطعات لاستیکی',
+          image: getProductImageUrl('e(648).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'لاستیک',
+        },
+        {
+          id: 'pr-3',
+          title: 'رولیک و چرخ',
+          image: getProductImageUrl('e(394).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicRoller,
+          query: 'چرخ',
+        },
+        {
+          id: 'pr-4',
+          title: 'تسمه انتقال',
+          image: STORE_ASSETS.products.pvcBelt,
+          fallbackImage: STORE_ASSETS.categories.belts,
+          query: 'تسمه',
+        },
+      ],
     },
     {
       id: 'kiln',
-      stageNumber: '۰۳',
-      title: 'کوره پخت رولری (قلب تپنده کارخانه)',
-      englishTitle: 'Roller Kiln Conveyor',
-      description: 'پخت بیسکویت و لعاب در دمای ۱۱۰۰ الی ۱۳۵۰ درجه با چرخش پیوسته و کاملاً هماهنگ صدها رولر سرامیکی نسوز.',
-      criticalChallenge: 'تابیدگی رولر در اثر شوک حرارتی، قفل شدن بلبرینگ‌های کوره در مجاورت هوای داغ، و افتادن اسلب روی رولرها.',
-      sanatPishSolution: 'رولرهای آلومینایی AL70/80/99 تست‌شده با کوارتر مهندسی و بلبرینگ‌های نسوز دمای بالای C4 با گریس کلوبر اصل آلمان.',
-      criticalParts: ['رولر سرامیکی آلومینایی کوره (AL70 / AL80)', 'بلبرینگ نسوز کوره سری 6200 C4', 'الکتروگیربکس‌های خطی حرکت رولر', 'زنجیرهای حرارتی نقاله کوره'],
-      icon: Flame,
+      number: '06',
+      shortLabel: 'کوره',
+      title: 'کوره پخت رولری و خط لعاب',
+      description: 'هدایت یکنواخت کاشی و اسلب در دمای بالا با بوش‌ها، انگشتی‌های رولر، چرخ‌دنده‌ها و تسمه‌های نسوز.',
+      details:
+        'کوره پخت رولری قلب کارخانه کاشی و سرامیک است. هماهنگی چرخش رولرها، مقاومت حرارتی بوش‌ها و سیالیت بلبرینگ‌ها و تسمه‌های انتقال خط لعاب و چاپ دیجیتال، مانع تابیدگی یا شکست کاشی در کوره می‌شود.',
       image: STORE_ASSETS.products.ceramicRoller,
+      hotspotX: '21%',
+      hotspotY: '33%',
+      query: 'رولر',
+      popularParts: [
+        {
+          id: 'kl-1',
+          title: 'بوش و انگشتی رولر',
+          image: getProductImageUrl('e(185).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicRoller,
+          query: 'بوش داخل رولر',
+        },
+        {
+          id: 'kl-2',
+          title: 'تسمه تایمینگ',
+          image: STORE_ASSETS.products.forzaBelt,
+          fallbackImage: STORE_ASSETS.categories.belts,
+          query: 'تسمه تایمینگ',
+        },
+        {
+          id: 'kl-3',
+          title: 'ریل و گاید هدایت',
+          image: getProductImageUrl('e(251).png'),
+          fallbackImage: STORE_ASSETS.forzaSubFittings,
+          query: 'ریل صنعتی',
+        },
+        {
+          id: 'kl-4',
+          title: 'برس خط لعاب',
+          image: getProductImageUrl('e(714).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'برس صنعتی',
+        },
+      ],
     },
     {
-      id: 'glaze',
-      stageNumber: '۰۴',
-      title: 'خط لعاب‌زنی و چاپ دیجیتال',
-      englishTitle: 'Glazing & Digital Print Line',
-      description: 'اعمال دوغاب لعاب، انگوب، افکت‌های مات و براق و چاپ طرح‌های رزولوشن بالا بر روی کاشی خام با حرکت یکنواخت.',
-      criticalChallenge: 'لغزش کاشی روی تسمه، خط افتادن روی بدنه و عدم هماهنگی گام حرکت کاشی با سنسور هد چاپگر دیجیتال.',
-      sanatPishSolution: 'تسمه‌های تایمینگ دنده‌ای با روکش لیناتکس طبیعی قرمز ۶-۸ میلی‌متر و تسمه‌های PU سبز ضدسایش بدون خط‌اندازی.',
-      criticalParts: ['تسمه تایمینگ روکش لیناتکس قرمز Linatex', 'تسمه PU دنده‌ای T10/AT10', 'پولی‌های آلومینیومی دقیق', 'تسمه‌های راند پلی‌اورتان'],
-      icon: Layers,
-      image: STORE_ASSETS.products.pvcBelt,
+      id: 'sorting-packaging',
+      number: '07',
+      shortLabel: 'سورت و بسته‌بندی',
+      title: 'پولیش، گونیاسازی، سورت و بسته‌بندی',
+      description: 'برش و کالیبراسیون دقیق، جابه‌جایی کاشی با لاستیک‌های مکنده وکیوم و بسته‌بندی اتوماتیک کارتن و پالت.',
+      details:
+        'در انتهای خط تولید، دستگاه‌های پولیش و رکتیفای، خطوط سورتینگ و بازوهای استاکر وکیوم به برس‌های ساب، لاستیک‌های مکنده تک‌طبقه و دوطبقه، تسمه‌های تایمینگ روکش‌دار و ریل‌های صنعتی نیاز دارند.',
+      image: STORE_ASSETS.industries.robotArm,
+      hotspotX: '9%',
+      hotspotY: '31%',
+      query: 'لاستیک مکنده',
+      popularParts: [
+        {
+          id: 'sp-1',
+          title: 'لاستیک مکنده',
+          image: getProductImageUrl('e(639).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'لاستیک مکنده',
+        },
+        {
+          id: 'sp-2',
+          title: 'برس ساب و پرداخت',
+          image: getProductImageUrl('e(710).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicParts,
+          query: 'برس ساب',
+        },
+        {
+          id: 'sp-3',
+          title: 'ریل و پروفیل',
+          image: getProductImageUrl('e(251).png'),
+          fallbackImage: STORE_ASSETS.forzaSubFittings,
+          query: 'ریل صنعتی',
+        },
+        {
+          id: 'sp-4',
+          title: 'چرخ پلی‌یورتان',
+          image: getProductImageUrl('e(378).png'),
+          fallbackImage: STORE_ASSETS.products.ceramicRoller,
+          query: 'چرخ با روکش پلی یورتان',
+        },
+      ],
+    },
+  ];
+
+  const activeStage =
+    productionStages.find((stage) => stage.id === activeStageId) ||
+    productionStages[4];
+
+  // ---------------------------------------------------------------------------
+  // 6 POPULAR CATEGORIES IN TILE & CERAMIC INDUSTRY
+  // ---------------------------------------------------------------------------
+  const popularCategories = [
+    {
+      id: 'cat-belts',
+      title: 'تسمه‌های صنعتی',
+      image: STORE_ASSETS.categories.belts,
+      fallbackImage: STORE_ASSETS.products.forzaBelt,
+      link: '/category/تسمه-و-انتقال-نیرو',
     },
     {
-      id: 'sorting',
-      stageNumber: '۰۵',
-      title: 'کالیبراسیون، گونیا، سورت و بسته‌بندی',
-      englishTitle: 'Squaring, Polishing & Packaging',
-      description: 'برش دقیق ابعادی (رکتیفای و پولیش)، کنترل کیفی هوشمند درجه‌بندی، کارتن‌گذاری اتوماتیک و پالت‌پیچی نهایی.',
-      criticalChallenge: 'سایش پودر سنگ و آب‌صابون روی زنجیرها و لقی و فرسایش یاتاقان‌های کله‌های پولیش در رطوبت مداوم.',
-      sanatPishSolution: 'زنجیرهای نقاله دوگانه ضدزنگ نیکل‌پلیتد و یاتاقان‌های هوزینگی با گریس‌خور آب‌بند جهت طول عمر ۳ برابری در محیط مرطوب.',
-      criticalParts: ['زنجیر نقاله دوطرفه خط گونیاسازی (80B)', 'تسمه نقاله PVC گریپ ضدلغزش', 'یاتاقان‌های ضد گردوغبار UCFL', 'چرخ‌زنجیرهای دوبل سخت‌کاری‌شده'],
-      icon: CheckCircle2,
-      image: STORE_ASSETS.categories.chains,
+      id: 'cat-pulleys',
+      title: 'پولی و کوپلینگ',
+      image: STORE_ASSETS.categories.pulleys,
+      fallbackImage: STORE_ASSETS.products.aluPulley,
+      link: '/products?q=' + encodeURIComponent('پولی'),
+    },
+    {
+      id: 'cat-rollers',
+      title: 'چرخ و رولیک',
+      image: getProductImageUrl('e(378).png'),
+      fallbackImage: STORE_ASSETS.products.ceramicRoller,
+      link: '/category/چرخ-و-رولر',
+    },
+    {
+      id: 'cat-rubber',
+      title: 'قطعات لاستیکی',
+      image: getProductImageUrl('e(817).png'),
+      fallbackImage: STORE_ASSETS.products.ceramicParts,
+      link: '/category/آب‌بندی-و-قطعات-لاستیکی',
+    },
+    {
+      id: 'cat-profiles',
+      title: 'پروفیل و ریل‌ها',
+      image: getProductImageUrl('e(251).png'),
+      fallbackImage: STORE_ASSETS.forzaSubFittings,
+      link: '/category/ریل-و-تجهیزات-هدایت',
+    },
+    {
+      id: 'cat-misc',
+      title: 'قطعات متفرقه',
+      image: getProductImageUrl('e(168).png'),
+      fallbackImage: STORE_ASSETS.forzaSubBearing,
+      link: '/category/قطعات-مکانیکی',
     },
   ];
 
   // ---------------------------------------------------------------------------
-  // DATA: CERAMIC PRODUCTS CATALOG
+  // 4 COMMON PRODUCTION LINE PROBLEMS & SOLUTIONS
   // ---------------------------------------------------------------------------
-  const ceramicProducts: CeramicProductItem[] = [
+  const commonProblems: ProblemItem[] = [
     {
-      id: 'prod-roller-al70',
-      name: 'رولر سرامیکی آلومینایی کوره پخت (گرید AL70)',
-      code: 'CER-ROL-AL70',
-      subTitle: 'مقاوم در برابر شوک حرارتی تا ۱۲۸۰°C، مناسب کوره‌های پخت بیسکویت و کاشی دیواری',
-      category: 'kiln',
-      categoryLabel: 'کوره پخت',
-      tempRating: '۱۲۸۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.ceramicRoller,
-      badge: 'پرفروش‌ترین در کارخانجات میبد',
-      keySpecs: [
-        { label: 'درصد آلومینا', value: '۷۰٪ - ۷۲٪ Al2O3' },
-        { label: 'مقاومت خمشی (MOR)', value: '≥ ۵۵ MPa' },
-        { label: 'ضریب انبساط حرارتی', value: '۵.۲ × 10^-6 /°C' },
-        { label: 'مقاومت شوک حرارتی', value: 'بسیار بالا (تست کوارتر)' },
-      ],
-      applications: 'مناسب محدوده پیش‌پخت و پخت اصلی در کوره‌های عرض ۲.۵ الی ۳.۱ متر',
+      id: 'prob-belt-wear',
+      title: 'سایش سریع تسمه',
+      subtitle: 'بررسی قطعات انتقال و راهکارهای پیشنهادی',
+      image: STORE_ASSETS.industries.ceramic,
+      symptom: 'پوسیدگی لبه‌ها، رد انداختن روی بدنه کاشی خام و کاهش عمر تسمه در خطوط لعاب، پرس و انتقال.',
+      cause: 'اصطکاک مستقیم با پودر سیلیس و لبه‌های تیز بیسکویت کاشی، یا عدم هم‌راستایی پولی‌ها و رولیک‌های هدایت.',
+      solution: 'استفاده از تسمه‌های تایمینگ PU سیم‌دار با روکش ضدسایش لیناتکس و بررسی هم‌محوری پولی‌های آلومینیومی و هرزگردها.',
+      recommendedQuery: 'تسمه تایمینگ',
     },
     {
-      id: 'prod-roller-al80',
-      name: 'رولر سرامیکی فوق نسوز پرسلان و اسلب (گرید AL80/AL99)',
-      code: 'CER-ROL-AL80',
-      subTitle: 'تحمل فوق‌العاده بار مکانیکی در دمای ۱۳۵۰°C برای خطوط تولید اسلب‌های سایز بزرگ',
-      category: 'kiln',
-      categoryLabel: 'کوره پخت',
-      tempRating: '۱۳۵۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.ceramicRoller,
-      badge: 'مخصوص کاشی پرسلان و اسلب',
-      keySpecs: [
-        { label: 'درصد آلومینا', value: '۸۰٪ - ۸۵٪ Al2O3' },
-        { label: 'مقاومت خمشی (MOR)', value: '≥ ۷۰ MPa' },
-        { label: 'تلرانس تابیدگی', value: '< ۰.۱ میلی‌متر در متر' },
-        { label: 'تحمل بار وزنی اسلب', value: 'تا ۱۲۰ کیلوگرم در هر رولر' },
-      ],
-      applications: 'ناحیه حداکثر پخت کوره‌های پرسلان و کارخانجات مدرن تولید اسلب',
+      id: 'prob-roller-break',
+      title: 'شکستگی چرخ و رولیک',
+      subtitle: 'معرفی رولیک مقاوم و جایگزین',
+      image: STORE_ASSETS.industries.manufacturing,
+      symptom: 'ترک‌خوردگی روکش چرخ‌ها، قفل شدن بلبرینگ داخل رولر و ایجاد ضربه در حرکت کاشی و اسلب.',
+      cause: 'بار دینامیکی بیش از حد، نفوذ گردوغبار سرامیک و آب به داخل بلبرینگ یا استفاده از پلیمرهای خشک و غیراستاندارد.',
+      solution: 'جایگزینی با چرخ‌های روکش پلی‌یورتان توپی فلزی بلبرینگ‌دار و بوش‌های داخل رولر تقویت‌شده مقاوم به سایش و حرارت.',
+      recommendedQuery: 'چرخ با روکش پلی یورتان',
     },
     {
-      id: 'prod-belt-linatex',
-      name: 'تسمه تایمینگ دنده‌ای با روکش لیناتکس خط لعاب و چاپ',
-      code: 'BELT-TIM-LNX',
-      subTitle: 'روکش لیناتکس اصل ضدسایش با اصطکاک بالا، بدون لغزش و با محافظت کامل از کاشی خام',
-      category: 'glaze',
-      categoryLabel: 'خط لعاب و چاپ',
-      tempRating: '۸۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.pvcBelt,
-      badge: 'استاندارد اروپایی FORZA',
-      keySpecs: [
-        { label: 'جنس روکش', value: 'لیناتکس طبیعی قرمز ۶-۸ میلی‌متر' },
-        { label: 'نوع گام دنده', value: 'T10 / AT10 / HTD 8M' },
-        { label: 'پایداری ابعادی', value: 'دارای کورد فولادی تقویت‌شده' },
-        { label: 'مقاومت شیمیایی', value: 'مقاوم در برابر لعاب و انگوب' },
-      ],
-      applications: 'خطوط چاپ دیجیتال، دستگاه‌های بل و لعاب‌زنی با حرکت کاملاً یکدست',
+      id: 'prob-tile-misalignment',
+      title: 'انحراف کاشی در خط انتقال',
+      subtitle: 'بررسی رولیک و سیستم هدایت',
+      image: STORE_ASSETS.industries.food,
+      symptom: 'کج شدن کاشی هنگام ورود به دستگاه چاپ دیجیتال، خط لعاب یا کالیبراسیون و لب‌پر شدن گوشه‌ها.',
+      cause: 'فرسایش نامتقارن ریل‌ها و گایدهای کناری، اختلاف قطر رولیک‌های موازی یا کشیدگی غیریکنواخت تسمه‌های موازی.',
+      solution: 'نصب ریل‌های صنعتی ضدسایش با تلرانس دقیق، کالیبره کردن چرخ‌های تفلونی هرزگرد و استفاده از تسمه‌های جفت‌شده (Matched Pair).',
+      recommendedQuery: 'ریل صنعتی',
     },
     {
-      id: 'prod-bearing-c4',
-      name: 'بلبرینگ نسوز کوره با لقی C4 و گریس کلوبر (Series 6200 HT)',
-      code: 'BRG-HT-6208',
-      subTitle: 'طراحی اختصاصی برای دمای بالای دیواره کوره با لقی شعاعی C4 جهت جلوگیری از گریپاژ',
-      category: 'kiln',
-      categoryLabel: 'کوره پخت',
-      tempRating: '۳۵۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.bearingNsk || STORE_ASSETS.products.bearing,
-      badge: 'اصالت تضمینی SKF / NSK',
-      keySpecs: [
-        { label: 'نوع روانکار', value: 'Klüber Asonic HT نسوز' },
-        { label: 'کلاس لقی داخلی', value: 'C4 High Thermal Clearance' },
-        { label: 'جنس رینگ و ساچمه', value: 'فولاد سخت‌کاری‌شده حرارتی' },
-        { label: 'نوع حفاظ', value: '2Z شیلد فلزی دوطرفه' },
-      ],
-      applications: 'هدایت چرخ‌دنده و زنجیر سر رولرهای کوره در مجاورت هوای داغ',
+      id: 'prob-line-downtime',
+      title: 'توقف ناگهانی خط تولید',
+      subtitle: 'بررسی قطعات انتقال و راهکارهای پیشگیرانه',
+      image: STORE_ASSETS.industries.bgPlant,
+      symptom: 'پارگی ناگهانی تسمه یا شکست کوپلینگ و توقف اضطراری خط پرس، خشک‌کن یا بسته‌بندی.',
+      cause: 'شوک‌های گشتاوری بالا، فرسودگی لاستیک کوپلینگ و عدم جایگزینی به‌موقع قطعات ضربه‌گیر و انتقال قدرت.',
+      solution: 'تأمین پیشگیرانه کوپلینگ‌های صنعتی، لاستیک‌های کوپلینگ ضدضربه، تسمه‌های فورزا (FORZA) و پولی‌های بالانس‌شده.',
+      recommendedQuery: 'کوپلینگ صنعتی',
+    },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // 6 RECOMMENDED PRODUCTS FOR TILE & CERAMIC INDUSTRY
+  // ---------------------------------------------------------------------------
+  const recommendedProducts: RecommendedProductItem[] = [
+    {
+      code: 'FAM-35245',
+      name: 'چرخ صنعتی',
+      subtitle: 'تحمل بار بالا و طول عمر زیاد',
+      spec: 'قطر: 50 - 200 mm',
+      image: getProductImageUrl('e(378).png'),
+      fallbackImage: STORE_ASSETS.products.ceramicRoller,
+      query: 'چرخ با روکش پلی یورتان',
     },
     {
-      id: 'prod-pulley-press',
-      name: 'پولی و فلکه چدنی سنگین خط پرس با بوش Taper Lock',
-      code: 'PUL-KILN-TL',
-      subTitle: 'چدن خاکستری دانه ریز با بالانس دینامیکی بالا جهت مهار ضربات سنگین پرس هیدرولیک',
-      category: 'press',
-      categoryLabel: 'پرس هیدرولیک',
-      tempRating: '۱۵۰°C',
-      inStock: true,
+      code: 'FAM-80274',
+      name: 'لاستیک ضربه‌گیر',
+      subtitle: 'مقاوم به سایش و ضربه',
+      spec: 'سفارشی‌سازی ابعاد',
+      image: getProductImageUrl('e(817).png'),
+      fallbackImage: STORE_ASSETS.products.ceramicParts,
+      query: 'ضربه‌گیر صنعتی',
+    },
+    {
+      code: 'FAM-41680',
+      name: 'پولی آلومینیومی',
+      subtitle: 'دقت بالا و وزن سبک',
+      spec: 'قطر: 50 - 500 mm',
       image: STORE_ASSETS.products.aluPulley,
-      badge: 'نصب و تعویض در کمتر از ۵ دقیقه',
-      keySpecs: [
-        { label: 'متریال', value: 'چدن خاکستری GG25 استاندارد' },
-        { label: 'سیستم اتصال', value: 'بوش مخروطی Taper Lock Bushing' },
-        { label: 'کلاس بالانس', value: 'ISO 1940 Class Q 6.3' },
-        { label: 'سازگاری تسمه', value: 'SPA, SPB, SPC, 8V' },
-      ],
-      applications: 'الکتروموتورهای اصلی پمپ هیدرولیک پرس‌های سکمی، ناسوتی و سیتی',
+      fallbackImage: getProductImageUrl('e(165).png'),
+      query: 'پولی',
     },
     {
-      id: 'prod-chain-squaring',
-      name: 'زنجیر نقاله دوطرفه خط گونیاسازی و کالیبراسیون',
-      code: 'CHN-SQ-80B',
-      subTitle: 'زنجیر سخت‌کاری‌شده با پین‌های مقاوم به سایش، ضدزنگ در برابر آب‌صابون و پودر سنگ',
-      category: 'sorting',
-      categoryLabel: 'گونیا و سورت',
-      tempRating: '۲۰۰°C',
-      inStock: true,
-      image: STORE_ASSETS.categories.chains,
-      badge: 'سختی سطحی ۵۸ HRC',
-      keySpecs: [
-        { label: 'استاندارد ساخت', value: 'DIN 8187 / ISO 606' },
-        { label: 'پوشش محافظ', value: 'پوشش نیکل ضدزنگ Nickel Plated' },
-        { label: 'طول عمر مفید', value: '۳ برابر زنجیرهای تجاری بازار' },
-        { label: 'پیوستگی ابعادی', value: 'جفت‌شده به صورت Pair Matching' },
-      ],
-      applications: 'خطوط رکتیفای، گونیا، پولیش و دستگاه‌های سورتینگ اتوماتیک کاشی',
+      code: 'FAM-BELT-TIM',
+      name: 'تسمه تایم صنعتی',
+      subtitle: 'مقاوم در دماهای بالا',
+      spec: 'گام: 200 mm - حرارت',
+      image: STORE_ASSETS.products.forzaBelt,
+      fallbackImage: STORE_ASSETS.categories.belts,
+      query: 'تسمه تایمینگ',
     },
     {
-      id: 'prod-nozzle-dryer',
-      name: 'نازل سرامیکی ضدسایش کاربید سیلیکون اسپری درایر',
-      code: 'NZL-SP-SIC',
-      subTitle: 'مقاومت استثنایی در برابر سایش دوغاب غلیظ سیلیس، حفظ زاویه پاشش و گرانول یکنواخت',
-      category: 'milling',
-      categoryLabel: 'اسپری درایر',
-      tempRating: '۶۰۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.ceramicParts,
-      badge: 'عمر مفید ۶ برابر فولاد تنگستن',
-      keySpecs: [
-        { label: 'متریال بدنه', value: 'کاربید سیلیکون باند واکنشی (SiSiC)' },
-        { label: 'سختی', value: '۲۵۰۰ HV (بسیار سخت)' },
-        { label: 'دقت سوراخ پاشش', value: 'تلرانس ±۰.۰۲ میلی‌متر' },
-        { label: 'مقاومت خوردگی', value: '۱۰۰٪ خنثی در برابر اسید و باز' },
-      ],
-      applications: 'لانس‌های پاشش پمپ‌های پیستونی در اسپری درایرهای کارخانجات کاشی',
+      code: 'FAM-40932',
+      name: 'رولیک نقاله',
+      subtitle: 'مناسب خطوط انتقال کاشی',
+      spec: 'قطر: 20 - 120 mm',
+      image: STORE_ASSETS.products.ceramicRoller,
+      fallbackImage: getProductImageUrl('e(168).png'),
+      query: 'رولر',
     },
     {
-      id: 'prod-gearbox-kiln',
-      name: 'الکتروگیربکس حلزونی و شافت مستقیم حرکت رولرهای کوره',
-      code: 'GBX-KILN-DRV',
-      subTitle: 'کارکرد پیوسته ۲۴ ساعته با حداقل لرزش جهت تضمین چرخش کاملاً منظم رولرها در کوره',
-      category: 'kiln',
-      categoryLabel: 'کوره پخت',
-      tempRating: '۱۲۰°C',
-      inStock: true,
-      image: STORE_ASSETS.products.motor,
-      badge: 'روغن‌کاری دائمی سنتتیک',
-      keySpecs: [
-        { label: 'نسبت تبدیل (Ratio)', value: 'i = 10 تا i = 100' },
-        { label: 'کلاس بازدهی موتور', value: 'IE3 Premium Efficiency' },
-        { label: 'درجه حفاظت', value: 'IP66 ضد گردوغبار سرامیک' },
-        { label: 'تطابق اینورتر', value: 'سازگار با کنترل دور VFD' },
-      ],
-      applications: 'محرک ماژول‌های انتقال کوره، کانوایرهای بیسکویت و بازوهای اتوماسیون',
+      code: 'FAM-52858',
+      name: 'تسمه نوار نقاله PVC',
+      subtitle: 'مقاوم به سایش و مواد شیمیایی',
+      spec: 'عرض: 50 - 1000 mm',
+      image: STORE_ASSETS.products.pvcBelt,
+      fallbackImage: getProductImageUrl('e(859).png'),
+      query: 'نوار نقاله',
     },
   ];
 
   // ---------------------------------------------------------------------------
-  // FILTERED PRODUCTS
+  // HANDLERS
   // ---------------------------------------------------------------------------
-  const filteredProducts = useMemo(() => {
-    return ceramicProducts.filter((product) => {
-      const matchesCategory =
-        selectedCategory === 'all' || product.category === selectedCategory;
-      const matchesSearch =
-        searchQuery.trim() === '' ||
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.subTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.applications.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStock = !inStockOnly || product.inStock;
+  const handleTechSpecSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = techSpecQuery.trim() || 'تسمه';
+    navigate(`/products?q=${encodeURIComponent(q)}`);
+  };
 
-      return matchesCategory && matchesSearch && matchesStock;
-    });
-  }, [selectedCategory, searchQuery, inStockOnly]);
+  const handleProblemSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = machineProblemQuery.trim() || 'سایش تسمه در خط کاشی';
+    navigate(`/ai-consult?industry=ceramic&q=${encodeURIComponent(q)}`);
+  };
 
-  // ---------------------------------------------------------------------------
-  // AI ADVISOR CALCULATION
-  // ---------------------------------------------------------------------------
-  const aiAdvisorResult = useMemo(() => {
-    let recommendedGrade = 'AL70 (۷۰٪ آلومینا)';
-    let thermalShockResistance = 'عالی (تحمل تا ۱۲۸۰ درجه)';
-    let maxLoadKg = '۶۰ کیلوگرم در هر رولر';
-    let rollerSpacing = '۵۵ تا ۶۵ میلی‌متر';
-    let riskNotes = 'مناسب خطوط نرمال کاشی دیواری و پرسلان سبک. مقاومت خمشی ۵۵ مگاپاسکال.';
-    let flexuralStrength = 58;
-
-    if (aiTileType === 'porcelain_slab') {
-      recommendedGrade = 'AL80 یا AL99 (۸۰ تا ۹۰ درصد آلومینا - Heavy Duty)';
-      thermalShockResistance = 'فوق مقاوم (تحمل تا ۱۳۵۰ درجه با شوک‌پذیری بالا)';
-      maxLoadKg = '۱۲۰ تا ۱۴۰ کیلوگرم در هر رولر';
-      rollerSpacing = '۴۵ تا ۵۰ میلی‌متر جهت جلوگیری از افتادگی اسلب';
-      riskNotes = 'به علت ابعاد بزرگ اسلب، تلرانس تابیدگی رولر باید کمتر از ۰.۱ میلی‌متر باشد.';
-      flexuralStrength = 78;
-    } else if (aiKilnTemp > 1250) {
-      recommendedGrade = 'AL80 نانو ساختار (Nano-Structured Alumina)';
-      thermalShockResistance = 'ویژه حداکثر دمای کوره (Peak Sintering)';
-      maxLoadKg = '۹۵ کیلوگرم';
-      rollerSpacing = '۵۰ میلی‌متر';
-      riskNotes = 'در این دما استفاده از گرید پایین‌تر موجب خمش رولر در زمان توقف احتمالی کوره می‌شود.';
-      flexuralStrength = 72;
-    }
-
-    const loadCapacityCalculated = Math.round((aiRollerDiameter / 50) * (aiKilnTemp > 1250 ? 90 : 70));
-
-    return {
-      grade: recommendedGrade,
-      shock: thermalShockResistance,
-      load: `${toPersianDigits(loadCapacityCalculated)} کیلوگرم`,
-      spacing: rollerSpacing,
-      notes: riskNotes,
-      mor: `${toPersianDigits(flexuralStrength)} MPa`,
-    };
-  }, [aiTileType, aiKilnTemp, aiRollerDiameter]);
-
-  // ---------------------------------------------------------------------------
-  // AI TROUBLESHOOTER DEFECT DATABASE
-  // ---------------------------------------------------------------------------
-  const defectDatabase = [
-    {
-      id: 'defect_roller_break',
-      title: 'شکستن یا ترک برداشتن رولر در منطقه خنک‌کن یا پیش‌پخت',
-      symptom: 'رولر در ناحیه گرادیان دمایی شدید ناگهان دو نیم می‌شود و باعث افتادن کاشی در کوره می‌گردد.',
-      rootCause:
-        'استفاده از رولرهای با ضریب انبساط حرارتی بالا یا ناخالصی فاز شیشه‌ای در متریال رولر، که تحمل شوک سرد شدن یا گرم شدن ناگهانی را ندارند.',
-      remedy:
-        'جایگزینی با رولرهای گرید AL70 با فاز مولایت کنترل‌شده و تست کوارتر حرارتی ۱۰۰٪. تنظیم دمای دمنده‌های هوای خنک‌کن.',
-      recommendedPart: 'رولر سرامیکی AL70 با تست کوارتر فورزا (کد: CER-ROL-AL70)',
-    },
-    {
-      id: 'defect_tile_curvature',
-      title: 'تابیدگی، شکم دادن و انحراف کاشی هنگام خروج از کوره پخت',
-      symptom: 'کاشی‌های خروجی دارای قوس محدب یا مقعر بوده و در دستگاه سورت رد می‌شوند.',
-      rootCause:
-        'عدم هم‌راستایی و تابیدگی رولرهای کوره به دلیل خمش در دمای بالا، یا اختلاف سرعت چرخش رولرهای مجاور ناشی از خوردگی زنجیر و چرخ‌دنده.',
-      remedy:
-        'بررسی رولرها با گیج ساعت ابعادی. تعویض رولرهای تاب‌برداشته با رولر تلرانس صفر AL80 و تعویض بلبرینگ‌های گریپاژشده C4.',
-      recommendedPart: 'رولر سرامیکی AL80 مخصوص پرسلان و اسلب (کد: CER-ROL-AL80)',
-    },
-    {
-      id: 'defect_glaze_slipping',
-      title: 'لغزش، جابجایی یا خط افتادن روی کاشی خام در خط لعاب و چاپ دیجیتال',
-      symptom: 'طرح چاپ دیجیتال کج می‌افتد یا لبه‌های کاشی حین عبور از زیر نازل لعاب لب‌پر می‌شود.',
-      rootCause:
-        'استهلاک روکش تسمه نقاله، سفت شدن لاستیک معمولی در اثر تماس با آب و مواد شیمیایی لعاب، یا تجمع دوغاب روی تسمه.',
-      remedy:
-        'به‌کارگیری تسمه‌های دنده‌ای PU با روکش لیناتکس طبیعی قرمز ۶ میلی‌متر با ضریب چسبندگی بالا و قابلیت شستشو بدون تغییر ابعاد.',
-      recommendedPart: 'تسمه تایمینگ دنده‌ای با روکش لیناتکس اصل (کد: BELT-TIM-LNX)',
-    },
-    {
-      id: 'defect_bearing_seizure',
-      title: 'داغ کردن، صدای غیرعادی و قفل شدن بلبرینگ‌های سر رولر کوره',
-      symptom: 'بلبرینگ بعد از چند هفته کارکرد در مجاورت بدنه کوره خشک شده و قفل می‌کند.',
-      rootCause:
-        'استفاده از بلبرینگ‌های معمولی با گریس پایه لیتیوم تجاری که در دمای بالای ۱۵۰ درجه تبخیر شده و بر اثر انبساط حرارتی ساچمه‌ها قفل می‌شوند.',
-      remedy:
-        'استفاده از بلبرینگ‌های کلاس لقی C4 با گریس تخصصی نسوز Klüber Asonic HT و شیلد فلزی محافظت در برابر گردوغبار نسوز.',
-      recommendedPart: 'بلبرینگ نسوز کوره سری 6200 با لقی C4 (کد: BRG-HT-6208)',
-    },
-  ];
-
-  const currentDefect =
-    defectDatabase.find((d) => d.id === selectedDefectId) || defectDatabase[0];
-
-  const openRfqWithItem = (itemName: string) => {
-    setRfqItem(itemName);
-    setRfqSuccess(false);
+  const openRfqModal = (itemTitle: string) => {
+    setRfqItemName(itemTitle);
+    setRfqSubmitted(false);
     setRfqModalOpen(true);
   };
 
   const handleRfqSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rfqPhone) return;
-    setRfqSuccess(true);
+    if (!rfqPhone.trim()) return;
+    setRfqSubmitted(true);
     setTimeout(() => {
       setRfqModalOpen(false);
-      setRfqSuccess(false);
-      setRfqName('');
+      setRfqSubmitted(false);
+      setRfqCustomerName('');
       setRfqPhone('');
-      setRfqPlantName('');
+      setRfqFactory('');
       setRfqNote('');
-    }, 3500);
+    }, 2800);
   };
 
   return (
-    <div className="w-full text-right font-sans min-h-screen bg-white text-[#55565A] select-none" dir="rtl">
-      
+    <div className="w-full min-h-screen bg-[#F5F6F8] text-[#2D3036] font-sans pb-16" dir="rtl">
       {/* ========================================================================= */}
-      {/* 0. VERTICAL ORANGE SCROLL INDICATOR LINE                                 */}
+      {/* 1. HERO BANNER SECTION (باکس روشن سمت چپ و تصویر خط تولید + آمار سمت راست) */}
       {/* ========================================================================= */}
-      <div className="fixed top-0 right-0 z-50 w-1.5 h-full pointer-events-none bg-slate-200">
-        <div
-          className="w-full bg-gradient-to-b from-[#C95210] via-[#E06518] to-[#FF8C00] shadow-[0_0_10px_#E06518] transition-all duration-75"
-          style={{ height: `${Math.round(scrollProgress * 100)}%` }}
-        />
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 1. TOP UTILITY BREADCRUMB STRIP                                          */}
-      {/* ========================================================================= */}
-      <div className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="text-xs font-bold text-slate-500 hover:text-[#E06518] flex items-center gap-1 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4 rotate-180" />
-              <span>صفحه اصلی</span>
-            </Link>
-            <span className="text-slate-300">/</span>
-            <span className="text-xs font-black text-[#55565A] flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-[#E06518]" />
-              صنایع کاشی و سرامیک و نسوز
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a
-              href="tel:03538739900"
-              className="hidden md:flex items-center gap-2 text-xs font-extrabold text-[#55565A] hover:text-[#E06518] px-3.5 py-1.5 rounded-lg border border-slate-200 hover:border-orange-300 transition-colors"
-            >
-              <PhoneCall className="w-3.5 h-3.5 text-[#E06518]" />
-              <span>تدارکات یزد و میبد: ۰۳۵-۳۸۷۳۹۹۰۰</span>
-            </a>
-
-            <button
-              type="button"
-              onClick={() => openRfqWithItem('استعلام کلی قطعات کاشی و سرامیک')}
-              className="h-9 px-4 bg-gradient-to-r from-[#C95210] to-[#E06518] hover:from-[#C2410C] hover:to-[#C95210] text-white text-xs font-black rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>استعلام فوری قیمت (RFQ)</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 2. FULL-SCREEN CINEMATIC HERO SECTION (خاکستری و نارنجی بر اساس صفحه اصلی) */}
-      {/* ========================================================================= */}
-      <section className="relative w-full overflow-hidden bg-[#55565A] text-white min-h-[580px] sm:min-h-[640px] lg:h-[700px] xl:h-[750px] flex flex-col justify-between border-b border-[#414146]">
-        
-        {/* Full-Bleed Plant Image with Neutral Gray Overlay */}
+      <section className="relative w-full overflow-hidden border-b border-slate-200/80 bg-[#23262B]">
+        {/* Background Factory Production Line Image */}
         <div className="absolute inset-0 z-0">
           <img
             src={STORE_ASSETS.industries.ceramic}
-            alt="خط تولید و کوره پخت کاشی و سرامیک"
-            className="w-full h-full object-cover object-center scale-105 filter grayscale-[0.3] brightness-[0.7] contrast-[1.1]"
+            alt="خط تولید کاشی و سرامیک"
+            className="w-full h-full object-cover object-center"
+            referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-l from-[#55565A]/95 via-[#55565A]/80 to-[#414146]/60" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#55565A] via-transparent to-[#55565A]/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/35 via-black/20 to-black/45" />
         </div>
 
-        {/* Diagonal Neon Laser Lines in Orange */}
-        <div className="absolute bottom-0 right-0 w-[60%] h-48 pointer-events-none z-1 overflow-hidden opacity-90">
-          <div className="absolute -bottom-10 right-10 w-[750px] h-[3.5px] bg-gradient-to-r from-transparent via-[#E06518] to-transparent rotate-[-18deg] shadow-[0_0_20px_#E06518]" />
-          <div className="absolute -bottom-20 right-40 w-[650px] h-[2px] bg-gradient-to-r from-transparent via-[#C95210] to-transparent rotate-[-18deg] shadow-[0_0_12px_#C95210]" />
-        </div>
+        <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end min-h-[420px] sm:min-h-[460px]">
+            {/* RIGHT COLUMN IN RTL (Factory View + Bottom Dark Stats Bar) */}
+            <div className="lg:col-span-7 flex flex-col justify-end h-full order-2 lg:order-1">
+              <div className="w-full sm:w-auto self-start bg-[#1E2024]/88 backdrop-blur-md text-white rounded-2xl border border-white/15 px-5 sm:px-8 py-4 shadow-xl">
+                <div className="grid grid-cols-3 gap-4 sm:gap-8 divide-x divide-x-reverse divide-white/15">
+                  {/* Stat 1 */}
+                  <div className="flex items-center gap-3 pr-0 pl-2 sm:pl-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-orange-400">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg sm:text-2xl font-black tracking-tight tabular-nums text-white" dir="ltr">
+                        +20
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-slate-300 font-medium whitespace-nowrap">
+                        سال تجربه صنعتی
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Micro Dot Matrix */}
-        <div className="absolute inset-0 z-1 bg-[radial-gradient(#E0651830_1.5px,transparent_1.5px)] [background-size:28px_28px] pointer-events-none opacity-50" />
+                  {/* Stat 2 */}
+                  <div className="flex items-center gap-3 pr-4 sm:pr-6 pl-2 sm:pl-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-orange-400">
+                      <Factory className="w-5 h-5" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg sm:text-2xl font-black tracking-tight tabular-nums text-white" dir="ltr">
+                        +120
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-slate-300 font-medium whitespace-nowrap">
+                        کارخانه فعال
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Main Content Container */}
-        <div className="relative z-10 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-14 lg:pt-16 pb-8 flex-1 flex flex-col justify-between">
-          
-          {/* Top Ribbon */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-[2.5px] bg-[#E06518] rounded-full shadow-[0_0_8px_#E06518]" />
-              <span className="text-xs sm:text-[13px] font-black text-orange-400 tracking-wider uppercase font-mono drop-shadow">
-                CERAMIC & PORCELAIN INDUSTRY — ATLAS TRADING
-              </span>
-            </div>
-
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-[11px] font-bold text-slate-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>پوشش کامل شهرک‌های صنعتی میبد، یزد، اصفهان و قزوین</span>
-            </div>
-          </div>
-
-          {/* Hero Center Text */}
-          <div className="my-auto py-6 max-w-3xl space-y-5 text-right">
-            <h1 className="text-3xl sm:text-5xl lg:text-[58px] font-black leading-[1.2] sm:leading-[1.15] tracking-tight text-white drop-shadow-xl">
-              تأمین تخصصی قطعات خطوط
-              <span className="block text-[#E06518] pt-2 drop-shadow-[0_4px_20px_rgba(224,101,24,0.6)]">
-                کاشی، پرسلان و کوره‌های پخت
-              </span>
-            </h1>
-
-            <p className="text-sm sm:text-base text-slate-200 font-medium leading-relaxed max-w-2xl drop-shadow-md">
-              مرکز دپو و پخش بدون‌واسطه رولرهای آلومینایی کوره پخت (گرید AL70 تا AL99)، بلبرینگ‌های نسوز دمای بالا C4،
-              تسمه‌های تایمینگ روکش لیناتکس خط لعاب و قطعات سنگین پرس با گارانتی کتبی عدم توقف خط در محل کارخانه.
-            </p>
-
-            {/* 3 Prominent Stat Pill Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3.5 rounded-2xl bg-[#414146]/90 backdrop-blur-md border border-white/20 shadow-lg space-y-1">
-                <div className="text-orange-400 font-mono font-black text-lg sm:text-xl drop-shadow">+۲,۴۰۰ شاخه</div>
-                <div className="text-xs text-white font-black">رولر آلومینایی دپو</div>
-                <div className="text-[11px] text-slate-300 font-medium">آماده بارگیری فوری در انبار میبد</div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#414146]/90 backdrop-blur-md border border-white/20 shadow-lg space-y-1">
-                <div className="text-emerald-400 font-mono font-black text-lg sm:text-xl drop-shadow">&lt; ۲۴ ساعت</div>
-                <div className="text-xs text-white font-black">تحویل در محل کارخانه</div>
-                <div className="text-[11px] text-slate-300 font-medium">ناوگان حمل اکسپرس شهرک‌های کاشی</div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#414146]/90 backdrop-blur-md border border-white/20 shadow-lg space-y-1">
-                <div className="text-cyan-400 font-mono font-black text-lg sm:text-xl drop-shadow">۱۳۵۰°C</div>
-                <div className="text-xs text-white font-black">تحمل شوک حرارتی</div>
-                <div className="text-[11px] text-slate-300 font-medium">تست کوارتر و آنالیز متالوژی</div>
+                  {/* Stat 3 */}
+                  <div className="flex items-center gap-3 pr-4 sm:pr-6">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-orange-400">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg sm:text-2xl font-black tracking-tight tabular-nums text-white" dir="ltr">
+                        +5,000
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-slate-300 font-medium whitespace-nowrap">
+                        قطعه مرتبط
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="pt-3 flex flex-wrap items-center gap-3.5">
-              <button
-                type="button"
-                onClick={() => openRfqWithItem('استعلام فوری رولرها و قطعات کوره پخت')}
-                className="h-12 sm:h-13 px-8 bg-gradient-to-r from-[#C95210] to-[#E06518] hover:from-[#C2410C] hover:to-[#C95210] text-white font-black text-xs sm:text-sm rounded-xl shadow-[0_8px_25px_rgba(224,101,24,0.5)] hover:scale-[1.02] transition-all flex items-center gap-2.5 cursor-pointer active:scale-95 group"
-              >
-                <FileText className="w-4 h-4 text-white" />
-                <span>ثبت استعلام پیش‌فاکتور (RFQ) کوره</span>
-                <ArrowLeft className="w-4 h-4 text-white group-hover:-translate-x-1 transition-transform" />
-              </button>
+            {/* LEFT COLUMN IN RTL (Frosted White Hero Card matching reference image) */}
+            <div className="lg:col-span-5 order-1 lg:order-2">
+              <div className="bg-white/92 backdrop-blur-xl rounded-3xl border border-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.18)] p-6 sm:p-8 text-right space-y-5">
+                {/* Breadcrumb */}
+                <nav
+                  aria-label="مسیر صفحه"
+                  className="flex items-center gap-2 text-xs font-medium text-slate-500"
+                >
+                  <Link to="/" className="hover:text-[#E06518] transition-colors">
+                    خانه
+                  </Link>
+                  <span className="text-slate-300">|</span>
+                  <Link to="/industries" className="hover:text-[#E06518] transition-colors">
+                    صنایع هدف
+                  </Link>
+                  <span className="text-slate-300">|</span>
+                  <span className="font-bold text-slate-800">صنعت کاشی و سرامیک</span>
+                </nav>
 
-              <a
-                href="#smart-ai-workstation"
-                className="h-12 sm:h-13 px-6 bg-[#414146]/90 hover:bg-[#414146] text-white font-extrabold text-xs sm:text-sm rounded-xl border border-white/25 hover:border-orange-500/70 backdrop-blur-md transition-all flex items-center gap-2 cursor-pointer shadow-md"
-              >
-                <Bot className="w-4 h-4 text-[#E06518]" />
-                <span>ورود به سامانه هوشمند مهندسی کاشی</span>
-              </a>
+                {/* Main Title */}
+                <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-black text-[#23262B] leading-[1.35] tracking-tight">
+                  تأمین <span className="text-[#E06518]">تخصصی قطعات</span>
+                  <span className="block mt-1">خطوط تولید کاشی و سرامیک</span>
+                </h1>
 
-              <a
-                href="#plant-stages"
-                className="h-12 sm:h-13 px-5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/20 backdrop-blur-md transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Sliders className="w-4 h-4 text-orange-400" />
-                <span>نقشه ۵ مرحله خط تولید</span>
-              </a>
+                {/* Subtitle */}
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+                  از انتقال مواد اولیه تا بسته‌بندی نهایی
+                  <br />
+                  با قطعات باکیفیت و خدمات فنی صنعت پیش
+                </p>
+
+                {/* Two CTA Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <Link
+                    to="/ai-consult?industry=ceramic"
+                    className="h-11 px-4 rounded-xl border-2 border-[#E06518]/80 bg-white hover:bg-orange-50 text-[#E06518] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+                  >
+                    <MessageSquare className="w-4 h-4 shrink-0" />
+                    <span>مشاوره تخصصی FORZA</span>
+                  </Link>
+
+                  <a
+                    href="#ceramic-recommended-products"
+                    className="h-11 px-4 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 transition-all whitespace-nowrap"
+                  >
+                    <Search className="w-4 h-4 shrink-0" />
+                    <span>جستجوی قطعات</span>
+                  </a>
+                </div>
+
+                {/* 4 Bottom Trust Items inside Hero Card */}
+                <div className="pt-4 border-t border-slate-200/80 grid grid-cols-4 gap-2 divide-x divide-x-reverse divide-slate-200/80 text-center">
+                  <div className="px-1 flex flex-col items-center gap-1.5">
+                    <ShieldCheck className="w-5 h-5 text-slate-600" />
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 leading-tight">
+                      پوشش کامل
+                      <br />
+                      خطوط تولید
+                    </span>
+                  </div>
+
+                  <div className="px-1 flex flex-col items-center gap-1.5">
+                    <Clock className="w-5 h-5 text-slate-600" />
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 leading-tight">
+                      تأمین سریع و
+                      <br />
+                      مطمئن
+                    </span>
+                  </div>
+
+                  <div className="px-1 flex flex-col items-center gap-1.5">
+                    <HelpCircle className="w-5 h-5 text-slate-600" />
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 leading-tight">
+                      مشاوره فنی و
+                      <br />
+                      انتخاب قطعه
+                    </span>
+                  </div>
+
+                  <div className="px-1 flex flex-col items-center gap-1.5">
+                    <RefreshCw className="w-5 h-5 text-slate-600" />
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 leading-tight">
+                      پوشش کامل
+                      <br />و جایگزین
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-
           </div>
-
-          {/* Bottom Trust Strip */}
-          <div className="pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300">
-            <div className="flex items-center gap-4">
-              <span className="font-extrabold text-white">همکاری با مجتمع‌های بزرگ:</span>
-              <span>کاشی میبد</span>
-              <span>•</span>
-              <span>کاشی مرجان</span>
-              <span>•</span>
-              <span>کاشی الوند</span>
-              <span>•</span>
-              <span>کاشی پرسپولیس</span>
-              <span>•</span>
-              <span>کاشی تکسرام</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-orange-400 font-bold">
-              <ShieldCheck className="w-4 h-4" />
-              <span>تضمین کتبی عدم خواب کوره و خطوط تولید</span>
-            </div>
-          </div>
-
         </div>
       </section>
 
-      {/* ========================================================================= */}
-      {/* 3. FULL-WIDTH SMART CERAMIC AI SYSTEM (خاکستری و نارنجی)                  */}
-      {/* ========================================================================= */}
-      <section
-        id="smart-ai-workstation"
-        className="relative w-full overflow-hidden bg-[#414146] text-white py-14 sm:py-20 border-b border-[#55565A] shadow-2xl"
-      >
-        <div className="absolute inset-0 z-0">
-          <img
-            src={STORE_ASSETS.industries.bgPlant}
-            alt="Plant Backdrop"
-            className="w-full h-full object-cover object-center opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-l from-[#414146]/95 via-[#414146]/80 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#414146] via-transparent to-[#414146]/90" />
-        </div>
-
-        <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#E06518]/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-[#E06518]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1.2px,transparent_1.2px)] [background-size:24px_24px] pointer-events-none" />
-
-        <div className="relative z-10 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-white/15 pb-6">
-            <div className="space-y-2 text-right max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 text-xs font-black">
-                <Bot className="w-4 h-4 text-[#E06518]" />
-                <span>سامانه هوشمند مهندسی کوره و خطوط کاشی FORZA AI WORKSTATION</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
-                سامانه هوشمند تحلیل گرید رولر و عیب‌یابی خطوط کاشی
+      {/* MAIN CONTENT CONTAINER */}
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-10">
+        {/* ========================================================================= */}
+        {/* 2. EXPLORE PRODUCTION LINE (کاوش خط تولید کاشی و سرامیک)                  */}
+        {/* ========================================================================= */}
+        <section className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-5 sm:p-8 space-y-6">
+          {/* Top Header */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="space-y-1.5 text-right">
+              <h2 className="text-xl sm:text-2xl font-black text-[#23262B]">
+                کاوش خط تولید کاشی و سرامیک
               </h2>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
-                بدون نیاز به محاسبات دستی پیچیده، پارامترهای کوره یا نوع عیب را انتخاب کنید تا محاسبات تنش خمشی،
-                گرید آلومینا و دستورالعمل‌های رفع عیب به صورت آنی شبیه‌سازی شود:
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                روی هر مرحله کلیک کنید تا قطعات مرتبط و توضیحات فنی را مشاهده کنید.
               </p>
-            </div>
-
-            {/* Segmented Mode Switcher */}
-            <div className="flex items-center gap-1.5 p-1.5 bg-[#55565A]/90 border border-white/20 rounded-2xl shrink-0 self-start lg:self-auto shadow-xl">
-              <button
-                type="button"
-                onClick={() => setAiTab('advisor')}
-                className={`px-5 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                  aiTab === 'advisor'
-                    ? 'bg-gradient-to-r from-[#C95210] to-[#E06518] text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Calculator className="w-4 h-4" />
-                <span>مشاور و محاسبه‌گر رولر کوره</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAiTab('troubleshooter')}
-                className={`px-5 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                  aiTab === 'troubleshooter'
-                    ? 'bg-gradient-to-r from-[#C95210] to-[#E06518] text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Wrench className="w-4 h-4" />
-                <span>عیب‌یاب هوشمند خرابی‌های خط</span>
-              </button>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setVideoModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-orange-200 bg-orange-50/50 hover:bg-orange-50 text-[#E06518] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <span className="w-5 h-5 rounded-md bg-[#E06518]/15 flex items-center justify-center">
+                    <Play className="w-3 h-3 fill-[#E06518] text-[#E06518]" />
+                  </span>
+                  <span>نمایش ویدیوی خط تولید</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* TAB 1: ADVISOR */}
-          {aiTab === 'advisor' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
-              <div className="lg:col-span-5 space-y-4 bg-[#55565A]/90 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-7 shadow-2xl text-right">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <h3 className="text-sm font-black text-white flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-[#E06518]" />
-                    <span>پارامترهای عملکردی کوره پخت:</span>
-                  </h3>
-                  <span className="text-[10px] font-mono text-orange-400 bg-orange-500/20 px-2 py-0.5 rounded border border-orange-500/30">
-                    REALTIME SIMULATION
-                  </span>
-                </div>
+          {/* Interactive 3D Isometric Production Line Diagram */}
+          <div className="relative w-full pt-2 pb-4 overflow-x-auto">
+            <div className="min-w-[860px] relative">
+              {/* Custom High-Detail Isometric 3D Ceramic Production Line SVG */}
+              <div className="relative w-full h-[230px] sm:h-[260px] rounded-2xl bg-gradient-to-b from-slate-50/70 via-white to-slate-50/90 border border-slate-100 overflow-hidden">
+                <svg
+                  viewBox="0 0 1200 280"
+                  className="w-full h-full select-none"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Subtle Isometric Technical Floor Grid */}
+                  <defs>
+                    <pattern id="isoGrid" width="40" height="24" patternUnits="userSpaceOnUse">
+                      <path
+                        d="M 0 12 L 20 0 L 40 12 L 20 24 Z"
+                        fill="none"
+                        stroke="#E2E8F0"
+                        strokeWidth="0.7"
+                      />
+                    </pattern>
+                    <linearGradient id="machineBody" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#F8FAFC" />
+                      <stop offset="100%" stopColor="#CBD5E1" />
+                    </linearGradient>
+                    <linearGradient id="machineSide" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#94A3B8" />
+                      <stop offset="100%" stopColor="#64748B" />
+                    </linearGradient>
+                    <linearGradient id="kilnGlow" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#EA580C" />
+                      <stop offset="50%" stopColor="#F97316" />
+                      <stop offset="100%" stopColor="#EA580C" />
+                    </linearGradient>
+                  </defs>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-slate-200">فرمت و نوع محصول تولیدی:</label>
-                  <select
-                    value={aiTileType}
-                    onChange={(e) => setAiTileType(e.target.value)}
-                    className="w-full bg-[#414146] border border-white/20 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:border-[#E06518] focus:outline-none"
-                  >
-                    <option value="porcelain_slab">اسلب سایز بزرگ و سوپر پرسلان (ابعاد ۱۲۰×۲۴۰ به بالا)</option>
-                    <option value="glazed_porcelain">کاشی پرسلان لعاب‌دار سایز متوسط (۶۰×۱۲۰ و ۸۰×۱۶۰)</option>
-                    <option value="wall_tile">کاشی دیواری استاندارد (مونوپروزا و دو پخت سبک)</option>
-                    <option value="floor_tile">کاشی کف پرتردد و گرانیتی متراکم</option>
-                  </select>
-                </div>
+                  <rect x="0" y="0" width="1200" height="280" fill="url(#isoGrid)" opacity="0.65" />
 
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-extrabold text-white flex items-center gap-1.5">
-                      <Flame className="w-4 h-4 text-[#E06518]" />
-                      <span>حداکثر دمای پخت کوره:</span>
-                    </label>
-                    <span className="font-mono font-black text-orange-400 bg-black/40 px-3 py-1 rounded-lg border border-white/15 text-sm">
-                      {toPersianDigits(aiKilnTemp)} °C
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1050"
-                    max="1350"
-                    step="25"
-                    value={aiKilnTemp}
-                    onChange={(e) => setAiKilnTemp(Number(e.target.value))}
-                    className="w-full accent-[#E06518] cursor-pointer h-2.5 bg-slate-700 rounded-lg"
+                  {/* Continuous Conveyor Line Track Base (Right x=1130 to Left x=60) */}
+                  <path
+                    d="M 1140 185 L 65 135 L 85 118 L 1155 168 Z"
+                    fill="#E2E8F0"
+                    stroke="#94A3B8"
+                    strokeWidth="1.5"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-300 font-mono font-bold">
-                    <span>1050°C (پیش‌پخت)</span>
-                    <span>1200°C (کاشی دیواری)</span>
-                    <span>1350°C (پرسلان اسلب)</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-extrabold text-white">قطر خارجی رولر (Outer Diameter):</label>
-                    <span className="font-mono font-black text-orange-400 bg-black/40 px-3 py-1 rounded-lg border border-white/15 text-sm">
-                      {toPersianDigits(aiRollerDiameter)} mm
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="40"
-                    max="65"
-                    step="5"
-                    value={aiRollerDiameter}
-                    onChange={(e) => setAiRollerDiameter(Number(e.target.value))}
-                    className="w-full accent-[#E06518] cursor-pointer h-2.5 bg-slate-700 rounded-lg"
-                  />
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-extrabold text-white">عرض مفید کوره / طول رولر:</label>
-                    <span className="font-mono font-black text-orange-400 bg-black/40 px-3 py-1 rounded-lg border border-white/15 text-sm">
-                      {toPersianDigits(aiKilnWidth.toFixed(1))} متر
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="2.2"
-                    max="3.8"
-                    step="0.1"
-                    value={aiKilnWidth}
-                    onChange={(e) => setAiKilnWidth(Number(e.target.value))}
-                    className="w-full accent-[#E06518] cursor-pointer h-2.5 bg-slate-700 rounded-lg"
-                  />
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-extrabold text-white">سرعت خط کوره (m/min):</label>
-                    <span className="font-mono font-black text-orange-400 bg-black/40 px-3 py-1 rounded-lg border border-white/15 text-sm">
-                      {toPersianDigits(aiLineSpeed)} m/min
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="35"
-                    step="1"
-                    value={aiLineSpeed}
-                    onChange={(e) => setAiLineSpeed(Number(e.target.value))}
-                    className="w-full accent-[#E06518] cursor-pointer h-2.5 bg-slate-700 rounded-lg"
-                  />
-                </div>
-
-              </div>
-
-              <div className="lg:col-span-7 space-y-4">
-                <div className="bg-[#55565A]/95 backdrop-blur-xl border-2 border-[#E06518]/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_35px_rgba(224,101,24,0.35)] space-y-6 text-right">
-                  
-                  <div className="flex items-center justify-between border-b border-white/15 pb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-[#E06518]/20 flex items-center justify-center border border-[#E06518]/40">
-                        <Sparkles className="w-4 h-4 text-[#E06518]" />
-                      </div>
-                      <div>
-                        <h4 className="font-black text-base text-white">نتیجه شبیه‌سازی فنی رولر FORZA</h4>
-                        <span className="text-[11px] text-slate-300 font-mono">ISO 10545 & DIN EN 14411</span>
-                      </div>
-                    </div>
-
-                    <span className="text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full font-mono">
-                      QC APPROVED ۱۰۰٪
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                    <div className="p-4 rounded-2xl bg-[#414146] border border-white/15 space-y-1">
-                      <span className="text-slate-300 font-bold block">گرید پیشنهادی رولر سرامیکی:</span>
-                      <div className="font-black text-orange-400 text-base">{aiAdvisorResult.grade}</div>
-                      <span className="text-[10px] text-slate-400">آلومینای کلسینه با خلوص بالا</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-[#414146] border border-white/15 space-y-1">
-                      <span className="text-slate-300 font-bold block">استحکام خمشی مدولوس (MOR):</span>
-                      <div className="font-black text-emerald-400 text-base font-mono">{aiAdvisorResult.mor}</div>
-                      <span className="text-[10px] text-slate-400">تحمل خمش در حداکثر بار حرارتی</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-[#414146] border border-white/15 space-y-1">
-                      <span className="text-slate-300 font-bold block">تحمل بار دینامیکی رولر:</span>
-                      <div className="font-black text-white text-base font-mono">{aiAdvisorResult.load}</div>
-                      <span className="text-[10px] text-slate-400">توزیع بار یکنواخت در عرض {toPersianDigits(aiKilnWidth.toFixed(1))} متر</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-[#414146] border border-white/15 space-y-1">
-                      <span className="text-slate-300 font-bold block">فاصله بهینه سنتر رولرها:</span>
-                      <div className="font-black text-cyan-400 text-base">{aiAdvisorResult.spacing}</div>
-                      <span className="text-[10px] text-slate-400">جلوگیری از شکم دادن بیسکویت کاشی</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-orange-500/15 border border-orange-500/30 text-xs text-orange-100 leading-relaxed space-y-1">
-                    <div className="font-extrabold text-orange-400 flex items-center gap-1.5">
-                      <AlertCircle className="w-4 h-4 text-[#E06518]" />
-                      <span>دستورالعمل مهندسی واحد نسوز و کوره صنعت‌پیش:</span>
-                    </div>
-                    <p>{aiAdvisorResult.notes}</p>
-                  </div>
-
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openRfqWithItem(
-                          `استعلام بر اساس شبیه‌سازی: ${aiAdvisorResult.grade} قطر ${aiRollerDiameter}mm دمای ${aiKilnTemp}°C`
-                        )
-                      }
-                      className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#C95210] to-[#E06518] hover:from-[#C2410C] hover:to-[#C95210] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_rgba(224,101,24,0.4)] cursor-pointer active:scale-95 transition-all"
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span>ثبت استعلام پیش‌فاکتور با این نتایج</span>
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiKilnTemp(1200);
-                        setAiRollerDiameter(50);
-                        setAiTileType('porcelain_slab');
-                        setAiKilnWidth(3.1);
-                      }}
-                      className="h-12 px-5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white font-bold text-xs rounded-xl border border-white/15 transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>تنظیم مجدد</span>
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 2: TROUBLESHOOTER */}
-          {aiTab === 'troubleshooter' && (
-            <div className="bg-[#55565A]/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-8 space-y-6 text-right shadow-2xl">
-              
-              <div className="space-y-2">
-                <div className="text-xs font-extrabold text-orange-400">یک ایراد شایع خط تولید کاشی را جهت عیب‌یابی انتخاب کنید:</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {defectDatabase.map((defect) => {
-                    const isSelected = selectedDefectId === defect.id;
+                  {/* Conveyor Support Legs */}
+                  {[120, 220, 320, 420, 520, 620, 720, 820, 920, 1020, 1100].map((lx, idx) => {
+                    const ly = 136 + ((lx - 65) / 1075) * 48;
                     return (
-                      <button
-                        key={defect.id}
-                        type="button"
-                        onClick={() => setSelectedDefectId(defect.id)}
-                        className={`p-4 rounded-2xl border text-right text-xs font-black transition-all cursor-pointer leading-snug flex items-start gap-2.5 ${
-                          isSelected
-                            ? 'bg-[#E06518] text-white border-[#E06518] shadow-[0_6px_20px_rgba(224,101,24,0.4)] scale-[1.02]'
-                            : 'bg-[#414146] text-slate-200 border-white/15 hover:border-orange-400 hover:bg-[#2B313A]'
-                        }`}
-                      >
-                        <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isSelected ? 'text-white' : 'text-orange-400'}`} />
-                        <span>{defect.title}</span>
-                      </button>
+                      <g key={idx}>
+                        <line x1={lx} y1={ly} x2={lx} y2={ly + 32} stroke="#64748B" strokeWidth="3" />
+                        <line x1={lx + 14} y1={ly - 8} x2={lx + 14} y2={ly + 24} stroke="#94A3B8" strokeWidth="2.5" />
+                      </g>
                     );
                   })}
-                </div>
+
+                  {/* Ceramic Tiles Moving Along the Conveyor Track */}
+                  {[150, 290, 445, 595, 760, 930].map((tx, idx) => {
+                    const ty = 132 + ((tx - 65) / 1075) * 48;
+                    return (
+                      <polygon
+                        key={idx}
+                        points={`${tx},${ty} ${tx + 34},${ty + 2} ${tx + 42},${ty - 5} ${tx + 8},${ty - 7}`}
+                        fill="#E7D8C5"
+                        stroke="#C2A887"
+                        strokeWidth="1"
+                      />
+                    );
+                  })}
+
+                  {/* ========================================================= */}
+                  {/* STAGE 01 (Far Right x=1040..1150): Raw Material Hoppers    */}
+                  {/* ========================================================= */}
+                  <g>
+                    {/* Silo 1 */}
+                    <rect x="1085" y="105" width="46" height="55" rx="4" fill="url(#machineBody)" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="1085,160 1131,160 1116,182 1100,182" fill="url(#machineSide)" stroke="#475569" strokeWidth="1.2" />
+                    <ellipse cx="1108" cy="105" rx="23" ry="7" fill="#E2E8F0" stroke="#64748B" strokeWidth="1.5" />
+                    {/* Silo 2 */}
+                    <rect x="1032" y="112" width="44" height="50" rx="4" fill="url(#machineBody)" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="1032,162 1076,162 1063,180 1045,180" fill="url(#machineSide)" stroke="#475569" strokeWidth="1.2" />
+                    {/* Inclined Belt Conveyor */}
+                    <path d="M 1040 168 L 965 135 L 972 128 L 1047 161 Z" fill="#475569" />
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 02 (x=880..985): Spray Dryer & Ball Mill            */}
+                  {/* ========================================================= */}
+                  <g>
+                    {/* Spray Dryer Cylinder Tower */}
+                    <rect x="900" y="75" width="58" height="82" rx="8" fill="url(#machineBody)" stroke="#475569" strokeWidth="1.6" />
+                    <ellipse cx="929" cy="75" rx="29" ry="8" fill="#F1F5F9" stroke="#475569" strokeWidth="1.5" />
+                    <polygon points="900,157 958,157 940,182 918,182" fill="#64748B" stroke="#475569" strokeWidth="1.4" />
+                    {/* Structural Frame */}
+                    <line x1="896" y1="85" x2="896" y2="184" stroke="#475569" strokeWidth="2.5" />
+                    <line x1="962" y1="85" x2="962" y2="184" stroke="#475569" strokeWidth="2.5" />
+                    <rect x="912" y="102" width="34" height="16" rx="2" fill="#E06518" opacity="0.85" />
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 03 (x=710..835): Final Milling & Screening          */}
+                  {/* ========================================================= */}
+                  <g>
+                    <polygon points="720,105 820,110 835,96 735,91" fill="#F8FAFC" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="720,105 820,110 820,165 720,160" fill="url(#machineBody)" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="820,110 835,96 835,151 820,165" fill="url(#machineSide)" stroke="#475569" strokeWidth="1.5" />
+                    {/* Control Panels & Pipes */}
+                    <rect x="735" y="118" width="22" height="30" rx="2" fill="#E2E8F0" stroke="#64748B" strokeWidth="1.2" />
+                    <rect x="768" y="120" width="36" height="22" rx="2" fill="#334155" />
+                    <circle cx="746" cy="128" r="3" fill="#E06518" />
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 04 (x=530..675): Vertical / Horizontal Dryer        */}
+                  {/* ========================================================= */}
+                  <g>
+                    <polygon points="535,70 655,76 675,60 555,54" fill="#F8FAFC" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="535,70 655,76 655,158 535,152" fill="url(#machineBody)" stroke="#64748B" strokeWidth="1.5" />
+                    <polygon points="655,76 675,60 675,142 655,158" fill="url(#machineSide)" stroke="#475569" strokeWidth="1.5" />
+                    {/* Vertical Dryer Columns & vents */}
+                    {[552, 582, 612, 638].map((vx, i) => (
+                      <line key={i} x1={vx} y1="74" x2={vx} y2="154" stroke="#94A3B8" strokeWidth="1.5" />
+                    ))}
+                    <rect x="562" y="96" width="24" height="14" rx="2" fill="#1E293B" />
+                    <rect x="605" y="98" width="24" height="14" rx="2" fill="#E06518" />
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 05 (x=375..500): Hydraulic Tile Press (Highlighted) */}
+                  {/* ========================================================= */}
+                  <g>
+                    {/* Tall Hydraulic Press Arch */}
+                    <polygon points="405,42 475,46 492,32 422,28" fill="#FFFFFF" stroke="#475569" strokeWidth="1.8" />
+                    <polygon points="405,42 475,46 475,152 405,148" fill="url(#machineBody)" stroke="#475569" strokeWidth="1.8" />
+                    <polygon points="475,46 492,32 492,138 475,152" fill="url(#machineSide)" stroke="#334155" strokeWidth="1.8" />
+                    {/* Hydraulic Cylinder Top */}
+                    <ellipse cx="448" cy="36" rx="16" ry="6" fill="#E06518" />
+                    <rect x="432" y="20" width="32" height="16" rx="3" fill="#334155" />
+                    {/* Press Opening & Die Mold */}
+                    <rect x="418" y="88" width="44" height="36" rx="3" fill="#1E293B" stroke="#E06518" strokeWidth="1.8" />
+                    <rect x="424" y="96" width="32" height="10" fill="#F97316" />
+                    {/* Active Highlight Ring on Floor under Stage 05 */}
+                    {activeStage.id === 'press' && (
+                      <ellipse
+                        cx="440"
+                        cy="162"
+                        rx="58"
+                        ry="18"
+                        fill="#E06518"
+                        fillOpacity="0.12"
+                        stroke="#E06518"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 4"
+                      />
+                    )}
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 06 (x=195..355): Multi-Zone Roller Hearth Kiln      */}
+                  {/* ========================================================= */}
+                  <g>
+                    <polygon points="200,82 342,90 360,74 218,66" fill="#F1F5F9" stroke="#475569" strokeWidth="1.6" />
+                    <polygon points="200,82 342,90 342,146 200,138" fill="url(#machineBody)" stroke="#475569" strokeWidth="1.6" />
+                    <polygon points="342,90 360,74 360,130 342,146" fill="url(#machineSide)" stroke="#334155" strokeWidth="1.6" />
+                    {/* Kiln Exhaust Pipes */}
+                    {[225, 265, 305].map((kx, i) => (
+                      <g key={i}>
+                        <rect x={kx} y="52" width="10" height="24" rx="2" fill="#64748B" stroke="#334155" strokeWidth="1.2" />
+                        <ellipse cx={kx + 5} cy="52" rx="5" ry="2" fill="#94A3B8" />
+                      </g>
+                    ))}
+                    {/* Glowing Roller Kiln Firing Strip */}
+                    <line x1="208" y1="118" x2="334" y2="125" stroke="url(#kilnGlow)" strokeWidth="5" strokeLinecap="round" />
+                    {/* Roller ends along kiln wall */}
+                    {[215, 230, 245, 260, 275, 290, 305, 320].map((rx, i) => (
+                      <circle key={i} cx={rx} cy={128 + i * 0.8} r="2.5" fill="#334155" />
+                    ))}
+                  </g>
+
+                  {/* ========================================================= */}
+                  {/* STAGE 07 (Far Left x=45..180): Sorting & Packaging Line   */}
+                  {/* ========================================================= */}
+                  <g>
+                    {/* Gantry Frame */}
+                    <polygon points="58,68 165,75 180,61 73,54" fill="#E2E8F0" stroke="#475569" strokeWidth="1.5" />
+                    <polygon points="58,68 165,75 165,136 58,129" fill="url(#machineBody)" stroke="#475569" strokeWidth="1.5" />
+                    {/* Vacuum Stacker Arm & Pallet */}
+                    <rect x="82" y="84" width="38" height="28" rx="3" fill="#334155" />
+                    <rect x="130" y="90" width="24" height="32" rx="2" fill="#E06518" opacity="0.9" />
+                    {/* Stacked Tile Pallets at Left End */}
+                    <rect x="32" y="112" width="22" height="24" rx="2" fill="#D97706" stroke="#92400E" strokeWidth="1.2" />
+                  </g>
+                </svg>
+
+                {/* Interactive Hotspot Number Badges (01 to 07) Positioned on Diagram */}
+                {productionStages.map((stage) => {
+                  const isSelected = stage.id === activeStage.id;
+                  return (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => setActiveStageId(stage.id)}
+                      style={{ left: stage.hotspotX, top: stage.hotspotY }}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer focus:outline-none transition-transform duration-200 ${
+                        isSelected ? 'scale-115' : 'hover:scale-110'
+                      }`}
+                      aria-label={`مرحله ${stage.number}: ${stage.title}`}
+                    >
+                      <span
+                        className={`relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full font-mono text-xs sm:text-sm font-black shadow-lg transition-all ${
+                          isSelected
+                            ? 'bg-[#E06518] text-white ring-4 ring-[#E06518]/30 shadow-orange-500/40'
+                            : 'bg-[#E06518] text-white/95 ring-2 ring-white hover:ring-orange-300'
+                        }`}
+                      >
+                        {stage.number}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
-                <div className="p-5 rounded-2xl bg-[#414146] border border-white/15 space-y-2">
-                  <div className="text-xs font-black text-slate-300 flex items-center gap-1.5">
-                    <HelpCircle className="w-4 h-4 text-slate-400" />
-                    <span>علائم مشاهده‌شده در خط تولید:</span>
-                  </div>
-                  <p className="text-xs text-slate-200 leading-relaxed font-normal">
-                    {currentDefect.symptom}
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 space-y-2">
-                  <div className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
-                    <span>علت ریشه‌ای مهندسی:</span>
-                  </div>
-                  <p className="text-xs text-amber-100 leading-relaxed font-normal">
-                    {currentDefect.rootCause}
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 space-y-2">
-                  <div className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>دستورالعمل مهندسی رفع عیب:</span>
-                  </div>
-                  <p className="text-xs text-emerald-100 leading-relaxed font-normal">
-                    {currentDefect.remedy}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-black/40 border border-white/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="space-y-1 text-right">
-                  <span className="text-[11px] font-mono text-orange-400">قطعه استاندارد جایگزین از انبار مرکزی صنعت‌پیش:</span>
-                  <div className="text-sm sm:text-base font-black text-white">{currentDefect.recommendedPart}</div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => openRfqWithItem(`استعلام قطعه رفع عیب: ${currentDefect.recommendedPart}`)}
-                  className="h-11 px-6 bg-[#E06518] hover:bg-[#C95210] text-white text-xs font-black rounded-xl transition-colors flex items-center gap-2 cursor-pointer shrink-0 shadow-md"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>استعلام فوری این قطعه</span>
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-              </div>
-
-            </div>
-          )}
-
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 4. FACTORY MAP: 5 STAGES                                                  */}
-      {/* ========================================================================= */}
-      <section id="plant-stages" className="py-14 sm:py-20 bg-white border-b border-slate-200">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          <div className="space-y-2 text-right max-w-3xl">
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-[2px] bg-[#E06518]" />
-              <span className="text-xs font-black text-[#E06518] tracking-wider uppercase font-mono">
-                CERAMIC PLANT EQUIPMENT MAP
-              </span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#55565A]">
-              صنعت‌پیش در کجای خط تولید کاشی و سرامیک به کار می‌آید؟
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 font-normal leading-relaxed">
-              روی هر یک از مراحل ۵ گانه خط تولید کلیک کنید تا متوجه شوید در هر ایستگاه چه چالش‌هایی وجود دارد و صنعت‌پیش چه تجهیزاتی را تضمین می‌کند:
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {plantStages.map((stage) => {
-              const Icon = stage.icon;
-              const isSelected = activeStageId === stage.id;
-              return (
-                <button
-                  key={stage.id}
-                  type="button"
-                  onClick={() => setActiveStageId(stage.id)}
-                  className={`p-4 rounded-2xl border text-right transition-all cursor-pointer flex flex-col justify-between gap-3 ${
-                    isSelected
-                      ? 'bg-[#55565A] text-white border-[#E06518] shadow-lg scale-[1.02]'
-                      : 'bg-[#F8F9FA] hover:bg-orange-50/50 text-[#55565A] border-slate-200 hover:border-orange-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className={`text-xs font-mono font-black ${isSelected ? 'text-orange-400' : 'text-slate-400'}`}>
-                      {stage.stageNumber}
-                    </span>
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isSelected ? 'bg-[#E06518] text-white' : 'bg-slate-200 text-slate-700'}`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-black leading-snug">{stage.title}</h3>
-                    <p className={`text-[10px] font-mono mt-0.5 truncate ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
-                      {stage.englishTitle}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {(() => {
-            const activeStage = plantStages.find((s) => s.id === activeStageId) || plantStages[2];
-            const StageIcon = activeStage.icon;
-            return (
-              <div className="rounded-3xl border border-slate-200 bg-[#FDFDFD] p-6 sm:p-10 shadow-sm">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-                  
-                  <div className="lg:col-span-7 space-y-4 text-right">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[#E06518] flex items-center justify-center shrink-0">
-                        <StageIcon className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-mono font-bold text-[#E06518]">{activeStage.stageNumber} / ۰۵</div>
-                        <h3 className="text-xl sm:text-2xl font-black text-[#55565A]">{activeStage.title}</h3>
-                      </div>
-                    </div>
-
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
-                      {activeStage.description}
-                    </p>
-
-                    <div className="space-y-3 pt-1">
-                      <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-right space-y-1">
-                        <div className="text-xs font-black text-amber-900 flex items-center gap-1.5">
-                          <AlertCircle className="w-4 h-4 text-amber-600" />
-                          <span>چالش و ریسک کارخانه در این ایستگاه:</span>
-                        </div>
-                        <p className="text-xs text-amber-800 leading-relaxed">
-                          {activeStage.criticalChallenge}
-                        </p>
-                      </div>
-
-                      <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-right space-y-1">
-                        <div className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>راهکار مهندسی و تضمینی صنعت‌پیش:</span>
-                        </div>
-                        <p className="text-xs text-emerald-800 leading-relaxed">
-                          {activeStage.sanatPishSolution}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <div className="text-xs font-black text-[#55565A]">قطعات استراتژیک قابل سفارش در این بخش:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {activeStage.criticalParts.map((part, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => openRfqWithItem(`استعلام ${part}`)}
-                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-orange-50 border border-slate-200 hover:border-[#E06518] text-xs font-bold text-slate-800 hover:text-[#E06518] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          >
-                            <span>{part}</span>
-                            <ArrowLeft className="w-3 h-3 text-slate-400" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-3">
+              {/* Stage Labels Strip Below Diagram (01 to 07 from Right to Left) */}
+              <div className="grid grid-cols-7 gap-2 pt-3 relative">
+                {productionStages.map((stage) => {
+                  const isSelected = stage.id === activeStage.id;
+                  return (
+                    <div key={stage.id} className="flex flex-col items-center">
                       <button
                         type="button"
-                        onClick={() => openRfqWithItem(`استعلام قطعات ایستگاه ${activeStage.title}`)}
-                        className="h-11 px-6 bg-[#55565A] hover:bg-[#E06518] text-white text-xs font-black rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                        onClick={() => setActiveStageId(stage.id)}
+                        className={`w-full py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center truncate ${
+                          isSelected
+                            ? 'bg-white text-[#23262B] font-black shadow-md border-2 border-[#E06518]'
+                            : 'bg-slate-100/90 hover:bg-slate-200/75 text-slate-700 border border-slate-200/80'
+                        }`}
                       >
-                        <FileText className="w-4 h-4 text-orange-400" />
-                        <span>استعلام قیمت قطعات این ایستگاه</span>
-                        <ArrowLeft className="w-3.5 h-3.5" />
+                        {stage.badgeLabel ? stage.badgeLabel : stage.shortLabel}
                       </button>
-                    </div>
-                  </div>
 
-                  <div className="lg:col-span-5">
-                    <div className="rounded-3xl overflow-hidden border border-slate-200 bg-slate-900 relative h-72 sm:h-80 shadow-md group">
-                      <img
-                        src={activeStage.image}
-                        alt={activeStage.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                      <div className="absolute bottom-4 inset-x-4 text-white text-right space-y-1">
-                        <div className="text-xs font-extrabold text-orange-400 flex items-center gap-1.5">
-                          <Award className="w-4 h-4 text-[#E06518]" />
-                          <span>تحویل همراه با برگه کنترل کیفیت مهندسی (QC)</span>
+                      {/* Dotted Connector Line to Active Stage Detail Box */}
+                      {isSelected && (
+                        <div className="flex flex-col items-center mt-1 -mb-5 z-10">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#E06518] ring-4 ring-orange-100" />
+                          <span className="w-0.5 h-4 border-r-2 border-dashed border-[#E06518]" />
                         </div>
-                        <div className="text-[11px] text-slate-300">
-                          استاندارد کارخانجات پیشرو در شهرک‌های صنعتی میبد و یزد
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-
-                </div>
+                  );
+                })}
               </div>
-            );
-          })()}
-
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 5. FILTERABLE CERAMIC PRODUCT CATALOG                                    */}
-      {/* ========================================================================= */}
-      <section className="py-14 sm:py-20 bg-[#F8F9FA] border-b border-slate-200">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-1 text-right">
-              <h2 className="text-2xl sm:text-3xl font-black text-[#55565A]">
-                کاتالوگ تخصصی قطعات خطوط کاشی و سرامیک
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 font-normal">
-                تمامی قطعات با تضمین اصالت، استاندارد ISO و صدور فاکتور رسمی عرضه می‌شوند.
-              </p>
-            </div>
-
-            <div className="relative w-full md:w-80">
-              <input
-                type="text"
-                placeholder="جستجوی نام قطعه، کد فنی یا کاربرد..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl pr-9 pl-3 py-2.5 text-xs text-slate-800 focus:border-[#E06518] focus:outline-none font-medium placeholder-slate-400 shadow-2xs"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 pb-1 border-b border-slate-200">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'all', label: 'همه قطعات' },
-                { id: 'kiln', label: 'کوره پخت رولری' },
-                { id: 'glaze', label: 'خط لعاب و چاپ' },
-                { id: 'press', label: 'پرس هیدرولیک' },
-                { id: 'sorting', label: 'گونیا و سورت' },
-                { id: 'milling', label: 'اسپری درایر و مواد' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(tab.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedCategory === tab.id
-                      ? 'bg-[#55565A] text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:border-orange-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={inStockOnly}
-                onChange={(e) => setInStockOnly(e.target.checked)}
-                className="w-4 h-4 accent-[#E06518] rounded cursor-pointer"
-              />
-              <span>فقط موجودی آماده تحویل انبار میبد</span>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-            {filteredProducts.map((prod) => (
-              <div
-                key={prod.id}
-                className="bg-white rounded-2xl border border-slate-200 hover:border-[#E06518] p-5 space-y-4 transition-all hover:shadow-xl flex flex-col justify-between text-right group"
-              >
-                <div className="space-y-3">
-                  <div className="relative aspect-[16/10] bg-[#DEE2E5] rounded-xl border border-[#CBD2D8] p-2 overflow-hidden flex items-center justify-center">
-                    <img
-                      src={prod.image}
-                      alt={prod.name}
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    />
-
-                    {prod.badge && (
-                      <span className="absolute top-2.5 right-2.5 bg-[#55565A]/90 text-orange-400 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md backdrop-blur-md">
-                        {prod.badge}
-                      </span>
-                    )}
-
-                    <span className="absolute bottom-2.5 right-2.5 bg-[#E06518] text-white font-mono text-[10px] font-black px-2 py-0.5 rounded">
-                      {prod.tempRating}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span>کد فنی: {prod.code}</span>
-                    <span className="text-emerald-600 font-sans font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      موجود در انبار میبد
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="font-black text-sm text-[#55565A] leading-snug group-hover:text-[#E06518] transition-colors">
-                      {prod.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium leading-relaxed pt-1">
-                      {prod.subTitle}
-                    </p>
-                  </div>
-
-                  <div className="bg-[#F8F9FA] rounded-xl p-3 border border-slate-100 space-y-1.5 text-xs">
-                    {prod.keySpecs.map((spec, i) => (
-                      <div key={i} className="flex justify-between items-center text-[11px]">
-                        <span className="text-slate-500">{spec.label}:</span>
-                        <span className="font-bold text-slate-800">{spec.value}</span>
-                      </div>
-                    ))}
-                  </div>
+          {/* Selected Stage Detail Panel (3 Columns matching reference design) */}
+          <div className="rounded-2xl bg-[#F9FAFB] border border-slate-200/90 p-4 sm:p-6 transition-all">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              {/* Column 1 (Right in RTL): Stage Title, Description & CTAs */}
+              <div className="lg:col-span-4 space-y-4 text-right">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-1 h-6 rounded-full bg-[#E06518]" />
+                  <h3 className="text-lg sm:text-xl font-black text-[#23262B]">
+                    {activeStage.title}
+                  </h3>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+                  {activeStage.description}
+                </p>
+
+                <div className="pt-2 flex flex-wrap items-center gap-4">
+                  <Link
+                    to={`/products?q=${encodeURIComponent(activeStage.query)}`}
+                    className="h-10 px-5 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>مشاهده قطعات مرتبط</span>
+                  </Link>
+
                   <button
                     type="button"
-                    onClick={() => openRfqWithItem(prod.name)}
-                    className="w-full h-11 rounded-xl bg-slate-100 hover:bg-[#E06518] text-slate-800 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer group/btn"
+                    onClick={() => setStageInfoModalOpen(true)}
+                    className="text-xs font-bold text-[#E06518] hover:text-[#C95210] flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>درخواست استعلام قیمت و مشخصات</span>
-                    <ArrowLeft className="w-3.5 h-3.5 group-hover/btn:-translate-x-1 transition-transform" />
+                    <span>اطلاعات بیشتر</span>
+                    <ChevronLeft className="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              {/* Column 2 (Center): Stage Close-Up Industrial Photo */}
+              <div className="lg:col-span-4">
+                <div className="w-full h-44 sm:h-48 rounded-2xl overflow-hidden border border-slate-200 shadow-xs bg-slate-100">
+                  <img
+                    src={activeStage.image}
+                    alt={activeStage.title}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              </div>
+
+              {/* Column 3 (Left in RTL): Popular Parts of This Stage (4 mini cards) */}
+              <div className="lg:col-span-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs sm:text-sm font-black text-[#23262B]">
+                    قطعات پرکاربرد این مرحله
+                  </h4>
+                  <Link
+                    to={`/products?q=${encodeURIComponent(activeStage.query)}`}
+                    className="text-xs font-bold text-[#E06518] hover:text-[#C95210] flex items-center gap-0.5 transition-colors"
+                  >
+                    <span>مشاهده همه</span>
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {activeStage.popularParts.map((part) => (
+                    <Link
+                      key={part.id}
+                      to={`/products?q=${encodeURIComponent(part.query)}`}
+                      className="group bg-white hover:bg-orange-50/40 rounded-xl border border-slate-200/90 hover:border-[#E06518]/60 p-2.5 flex flex-col items-center text-center transition-all shadow-2xs"
+                    >
+                      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-lg bg-slate-50 flex items-center justify-center p-1.5 overflow-hidden mb-2">
+                        <img
+                          src={part.image}
+                          alt={part.title}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = part.fallbackImage;
+                          }}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#E06518] transition-colors line-clamp-1">
+                        {part.title}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 3. THREE SMART WAYS TO FIND PARTS (سه روش هوشمند برای پیدا کردن قطعه)     */}
+        {/* ========================================================================= */}
+        <section className="space-y-4">
+          <h2 className="text-lg sm:text-xl font-black text-[#23262B] text-right">
+            سه روش هوشمند برای پیدا کردن قطعه مورد نیاز
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Card 1 (Right in RTL): Visual Part Identification (Highlighted Orange Tint) */}
+            <div className="rounded-2xl bg-[#FFF6EE] border border-[#F6C39E] p-5 sm:p-6 flex flex-col justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-[#FDE6D2] border border-[#F5B686] text-[#E06518] flex items-center justify-center shrink-0">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <div className="text-right space-y-1">
+                  <h3 className="text-sm sm:text-base font-black text-[#23262B]">
+                    شناسایی قطعه از روی تصویر
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    عکس قطعه را بارگذاری کنید تا مشابه موجود را پیشنهاد دهیم
+                  </p>
+                </div>
+              </div>
+
+              <PartIdentificationLink
+                to="/identify-part"
+                className="w-full h-11 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                <span>بارگذاری قطعه تصویر</span>
+              </PartIdentificationLink>
+            </div>
+
+            {/* Card 2 (Middle): Search by Technical Specifications */}
+            <div className="rounded-2xl bg-white border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                  <SlidersHorizontal className="w-6 h-6" />
+                </div>
+                <div className="text-right space-y-1">
+                  <h3 className="text-sm sm:text-base font-black text-[#23262B]">
+                    جستجو با مشخصات فنی
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    نام قطعه، ابعاد، جنس یا مدل دستگاه را وارد کنید.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleTechSpecSearch} className="relative w-full">
+                <input
+                  type="text"
+                  value={techSpecQuery}
+                  onChange={(e) => setTechSpecQuery(e.target.value)}
+                  placeholder="مثال: تسمه عرض 50 میلی‌متر، مقاوم به حرارت ..."
+                  className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 pr-3.5 pl-10 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#E06518] focus:outline-none transition-colors"
+                />
+                <button
+                  type="submit"
+                  aria-label="جستجو با مشخصات فنی"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-[#E06518] hover:bg-orange-50 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+
+            {/* Card 3 (Left in RTL): Search by Machine Problem */}
+            <div className="rounded-2xl bg-white border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                  <ClipboardList className="w-6 h-6" />
+                </div>
+                <div className="text-right space-y-1">
+                  <h3 className="text-sm sm:text-base font-black text-[#23262B]">
+                    جستجو با مشکل دستگاه
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    مشکل خط تولید را توصیف کنید تا قطعات پیشنهادی را دریافت کنید.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleProblemSearch} className="relative w-full">
+                <input
+                  type="text"
+                  value={machineProblemQuery}
+                  onChange={(e) => setMachineProblemQuery(e.target.value)}
+                  placeholder="مثال: تسمه نوار نقاله سریع دچار سایش می‌شود ..."
+                  className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 pr-3.5 pl-10 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-[#E06518] focus:outline-none transition-colors"
+                />
+                <button
+                  type="submit"
+                  aria-label="جستجو با مشکل دستگاه"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-slate-600 hover:text-[#E06518] hover:bg-orange-50 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 4. POPULAR PART CATEGORIES (دسته‌بندی قطعات پرکاربرد در صنعت کاشی و سرامیک) */}
+        {/* ========================================================================= */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-black text-[#23262B]">
+              دسته‌بندی قطعات پرکاربرد در صنعت کاشی و سرامیک
+            </h2>
+            <Link
+              to="/categories"
+              className="text-xs font-bold text-[#E06518] hover:text-[#C95210] flex items-center gap-1 transition-colors"
+            >
+              <span>مشاهده همه دسته‌بندی‌ها</span>
+              <ChevronLeft className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {popularCategories.map((cat) => (
+              <Link
+                key={cat.id}
+                to={cat.link}
+                className="group bg-white rounded-2xl border border-slate-200/90 hover:border-[#E06518]/60 shadow-2xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+              >
+                <div className="w-full h-32 sm:h-36 bg-slate-50/70 p-3 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={cat.image}
+                    alt={cat.title}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = cat.fallbackImage;
+                    }}
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="px-3.5 py-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs sm:text-[13px] font-extrabold text-[#23262B] group-hover:text-[#E06518] transition-colors truncate">
+                    {cat.title}
+                  </span>
+                  <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-[#E06518] group-hover:-translate-x-0.5 transition-all shrink-0" />
+                </div>
+              </Link>
             ))}
           </div>
+        </section>
 
-          {filteredProducts.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 space-y-2">
-              <Package className="w-10 h-10 text-slate-300 mx-auto" />
-              <h4 className="text-sm font-black text-slate-700">هیچ قطعه‌ای مطابق با عبارت واردشده پیدا نشد</h4>
-              <p className="text-xs text-slate-500">
-                می‌توانید فیلتر جستجو را پاک کنید یا برای استعلام ساخت سفارشی با ما تماس بگیرید.
+        {/* ========================================================================= */}
+        {/* 5. FORZA SPECIALIST CONSULT + COMMON PRODUCTION LINE PROBLEMS             */}
+        {/* ========================================================================= */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* Right Column in RTL (4 cols): مشاوره تخصصی FORZA */}
+          <div className="lg:col-span-4 rounded-2xl bg-gradient-to-b from-white via-[#F5F8FC] to-[#E9EFF8] border border-slate-200/90 p-6 flex flex-col justify-between shadow-xs relative overflow-hidden">
+            <div className="space-y-2 text-right relative z-10">
+              <h3 className="text-lg sm:text-xl font-black text-[#23262B]">
+                مشاوره تخصصی FORZA
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                با کمک هوش مصنوعی و دانش فنی صنعت پیش بهترین قطعه را برای خط تولید خود انتخاب کنید.
               </p>
             </div>
-          )}
 
-        </div>
-      </section>
+            <div className="grid grid-cols-12 gap-2 items-center my-4 relative z-10">
+              {/* Checklist on Right */}
+              <ul className="col-span-7 space-y-2.5 text-right">
+                {[
+                  'پاسخ به سوالات فنی',
+                  'مقایسه قطعات مشابه',
+                  'پیشنهاد جایگزین',
+                  'استعلام قیمت و موجودی',
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                    <CheckCircle2 className="w-4 h-4 text-[#E06518] shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
 
-      {/* ========================================================================= */}
-      {/* 6. WHY SANATPISH (درباره ما، مجوزها، اصالت و آدرس کارخانه میبد)           */}
-      {/* ========================================================================= */}
-      <section className="py-14 sm:py-20 bg-white border-b border-slate-200">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-4">
-            <div className="space-y-2 text-right">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 text-[#E06518] text-xs font-bold border border-orange-200">
-                <Building2 className="w-3.5 h-3.5" />
-                <span>هویت سازمانی و اصالت زنجیره تأمین</span>
+              {/* 3D FORZA Robot Image on Left */}
+              <div className="col-span-5 flex items-center justify-center">
+                <img
+                  src={STORE_ASSETS.aiConsultRobot}
+                  alt="دستیار هوشمند FORZA"
+                  className="w-28 h-28 sm:w-32 sm:h-32 object-contain drop-shadow-md rounded-2xl"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#55565A]">
-                چرا کارخانجات کاشی و سرامیک به صنعت‌پیش اعتماد می‌کنند؟
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-600 font-normal">
-                مزایای انحصاری همکاری صنعتی، آزمون‌های QC، دپوی شبانه‌روزی میبد، فاکتور رسمی و گواهینامه‌های معتبر بین‌المللی:
-              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Link
-                to="/about"
-                className="h-10 px-4 bg-[#55565A] hover:bg-[#2B313A] text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-2xs"
-              >
-                <Building2 className="w-3.5 h-3.5 text-orange-400" />
-                <span>درباره و تاریخچه شرکت</span>
-              </Link>
-              <Link
-                to="/contact?tab=factory"
-                className="h-10 px-4 bg-[#E06518] hover:bg-[#C95210] text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-2xs"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>آدرس انبار مرکزی میبد</span>
-              </Link>
-            </div>
+            <Link
+              to="/ai-consult?industry=ceramic"
+              className="relative z-10 w-full h-11 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>شروع گفتگو با FORZA</span>
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* CARD 1 */}
-            <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-slate-200 hover:border-[#E06518] space-y-3 text-right shadow-2xs transition-all flex flex-col justify-between group">
-              <div className="space-y-2.5">
-                <div className="w-11 h-11 rounded-xl bg-orange-100 text-[#E06518] flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Thermometer className="w-5 h-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#55565A] group-hover:text-[#E06518] transition-colors">
-                  آزمون کوارتر و شوک حرارتی
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  تمامی رولرهای کوره تحت آزمون سنجش خمش و مقاومت شوک حرارتی قرار می‌گیرند تا خطر تابیدگی در دمای بالا به صفر برسد.
-                </p>
-              </div>
+          {/* Left Column in RTL (8 cols): مشکلات رایج در خط تولید و راهکارهای پیشنهادی */}
+          <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-black text-[#23262B]">
+                مشکلات رایج در خط تولید و راهکارهای پیشنهادی
+              </h3>
               <Link
-                to="/about?tab=licenses"
-                className="pt-2 border-t border-slate-200 text-xs font-bold text-[#E06518] hover:underline flex items-center justify-between"
+                to="/ai-consult?industry=ceramic"
+                className="text-xs font-bold text-[#E06518] hover:text-[#C95210] flex items-center gap-1 transition-colors"
               >
-                <span>مشاهده سرتیفیکیت‌ها و QC</span>
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>مشاهده همه</span>
+                <ChevronLeft className="w-4 h-4" />
               </Link>
             </div>
 
-            {/* CARD 2 */}
-            <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-slate-200 hover:border-[#E06518] space-y-3 text-right shadow-2xs transition-all flex flex-col justify-between group">
-              <div className="space-y-2.5">
-                <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Warehouse className="w-5 h-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#55565A] group-hover:text-[#E06518] transition-colors">
-                  دپوی ۲۴ ساعته انبار میبد
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  با داشتن انبار استراتژیک در قطب کاشی کشور (جاده سنتو)، تحویل قطعات پرمصرف در کمتر از ۲ ساعت در محل کارخانه انجام می‌پذیرد.
-                </p>
-              </div>
-              <Link
-                to="/contact?tab=factory"
-                className="pt-2 border-t border-slate-200 text-xs font-bold text-[#E06518] hover:underline flex items-center justify-between"
-              >
-                <span>مسیریابی انبار میبد</span>
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            {/* CARD 3 */}
-            <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-slate-200 hover:border-[#E06518] space-y-3 text-right shadow-2xs transition-all flex flex-col justify-between group">
-              <div className="space-y-2.5">
-                <div className="w-11 h-11 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Award className="w-5 h-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#55565A] group-hover:text-[#E06518] transition-colors">
-                  تندیس زرین تأمین‌کننده برتر
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  افتخار همکاری با کارخانجات بزرگ کاشی میبد، مرجان، الوند و تکسرام همراه با تندیس ملی کیفیت و تقدیرنامه رضایت صنعتی.
-                </p>
-              </div>
-              <Link
-                to="/about?tab=awards"
-                className="pt-2 border-t border-slate-200 text-xs font-bold text-[#E06518] hover:underline flex items-center justify-between"
-              >
-                <span>مشاهده افتخارات و تندیس‌ها</span>
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            {/* CARD 4 */}
-            <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-slate-200 hover:border-[#E06518] space-y-3 text-right shadow-2xs transition-all flex flex-col justify-between group">
-              <div className="space-y-2.5">
-                <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#55565A] group-hover:text-[#E06518] transition-colors">
-                  فاکتور رسمی و کد اقتصادی
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  فروش مستقیم با سرتیفیکیت معتبر سازنده، ارزش افزوده قانونی و کد اقتصادی معتبر جهت ثبت بی‌دردسر در امور مالی کارخانجات.
-                </p>
-              </div>
-              <Link
-                to="/about?tab=licenses"
-                className="pt-2 border-t border-slate-200 text-xs font-bold text-[#E06518] hover:underline flex items-center justify-between"
-              >
-                <span>استعلام کد اقتصادی و شناسه ملی</span>
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 7. FAST CONTACT & PROCUREMENT CTA BANNER                                  */}
-      {/* ========================================================================= */}
-      <section className="py-14 sm:py-16 bg-[#55565A] text-white">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
-            <div className="lg:col-span-8 space-y-3.5 text-right">
-              <div className="text-xs font-bold text-orange-400">واحد مهندسی و تدارکات کاشی و سرامیک صنعت‌پیش</div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
-                نیاز فوری به استعلام قیمت یا اعزام کارشناس فنی دارید؟
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-200 font-normal leading-relaxed max-w-2xl">
-                کارشناسان فنی صنعت‌پیش در شهرک‌های صنعتی میبد و یزد آماده ارائه مشاوره حضوری، اندازه‌گیری در محل کارخانه و صدور پیش‌فاکتور رسمی هستند.
-              </p>
-
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                <a
-                  href="tel:03538739900"
-                  className="h-11 px-6 bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
-                  dir="ltr"
-                >
-                  <PhoneCall className="w-4 h-4" />
-                  <span className="font-mono">۰۳۵-۳۸۷۳۹۹۰۰</span>
-                </a>
-
-                <a
-                  href="https://wa.me/989120000000"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="h-11 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>ارسال لیست اقلام در واتساپ</span>
-                </a>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+              {commonProblems.map((prob) => (
                 <button
+                  key={prob.id}
                   type="button"
-                  onClick={() => openRfqWithItem('استعلام فوری سبد خرید کارخانه')}
-                  className="h-11 px-5 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 cursor-pointer"
+                  onClick={() => setSelectedProblem(prob)}
+                  className="group text-right bg-[#F9FAFB] hover:bg-white rounded-2xl border border-slate-200/80 hover:border-[#E06518]/60 hover:shadow-md transition-all overflow-hidden flex flex-col justify-between cursor-pointer"
                 >
-                  <FileText className="w-4 h-4 text-orange-400" />
-                  <span>تکمیل فرم درخواست پیش‌فاکتور</span>
+                  <div>
+                    <div className="w-full h-28 sm:h-32 overflow-hidden bg-slate-200">
+                      <img
+                        src={prob.image}
+                        alt={prob.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="p-3.5 space-y-1.5">
+                      <h4 className="text-xs sm:text-[13px] font-black text-[#23262B] group-hover:text-[#E06518] transition-colors">
+                        {prob.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
+                        {prob.subtitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-3.5 pb-3 flex items-center justify-end">
+                    <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-[#E06518] group-hover:-translate-x-0.5 transition-all" />
+                  </div>
                 </button>
-              </div>
+              ))}
             </div>
-
-            <div className="lg:col-span-4 p-5 rounded-2xl bg-white/5 border border-white/10 text-right space-y-2 text-xs text-slate-200">
-              <div className="font-bold text-white flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-orange-400" />
-                ساعات پاسخگویی واحد کاشی و سرامیک:
-              </div>
-              <p>شنبه تا چهارشنبه: ۸:۰۰ الی ۱۸:۰۰</p>
-              <p>پشتیبانی اضطراری شبانه‌روزی برای خطوط متوقف</p>
-              <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300">
-                دفتر مرکزی یزد: منطقه صنعتی ته‌بندی، مجاور شهرک جهان‌آباد میبد
-              </div>
-            </div>
-
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 6. RECOMMENDED PRODUCTS (محصولات پیشنهادی برای صنعت کاشی و سرامیک)         */}
+        {/* ========================================================================= */}
+        <section id="ceramic-recommended-products" className="space-y-4 scroll-mt-20">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-black text-[#23262B]">
+              محصولات پیشنهادی برای صنعت کاشی و سرامیک
+            </h2>
+            <Link
+              to="/products"
+              className="text-xs font-bold text-[#E06518] hover:text-[#C95210] flex items-center gap-1 transition-colors"
+            >
+              <span>مشاهده همه محصولات</span>
+              <ChevronLeft className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {recommendedProducts.map((item) => {
+              const wished = isInWishlist(item.code);
+              return (
+                <div
+                  key={item.code}
+                  className="bg-white rounded-2xl border border-slate-200/90 hover:border-orange-300 shadow-2xs hover:shadow-md transition-all p-4 flex flex-col justify-between relative group"
+                >
+                  {/* Wishlist Heart Icon (Top Left) */}
+                  <button
+                    type="button"
+                    onClick={() => toggleWishlist(item.code)}
+                    aria-label={`افزودن ${item.name} به علاقه‌مندی‌ها`}
+                    className="absolute top-3 left-3 z-10 w-7 h-7 rounded-full bg-slate-50 hover:bg-orange-50 flex items-center justify-center text-slate-400 hover:text-[#E06518] transition-colors cursor-pointer"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        wished ? 'fill-[#E06518] text-[#E06518]' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Product Studio Image */}
+                  <div>
+                    <Link
+                      to={`/products?q=${encodeURIComponent(item.query)}`}
+                      className="w-full h-32 sm:h-36 flex items-center justify-center p-2 mb-3 overflow-hidden"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = item.fallbackImage;
+                        }}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                        referrerPolicy="no-referrer"
+                      />
+                    </Link>
+
+                    {/* Title & Subtitle */}
+                    <div className="text-center space-y-1 mb-3">
+                      <Link
+                        to={`/products?q=${encodeURIComponent(item.query)}`}
+                        className="block text-sm font-black text-[#23262B] hover:text-[#E06518] transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                        {item.subtitle}
+                      </p>
+                      <div className="pt-1 flex items-center justify-center gap-1 text-[11px] text-slate-600 font-medium">
+                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{item.spec}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Price Inquiry Button */}
+                  <button
+                    type="button"
+                    onClick={() => openRfqModal(`${item.name} (${item.spec})`)}
+                    className="w-full h-9 rounded-xl border border-[#E06518]/75 text-[#E06518] hover:bg-[#E06518] hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    استعلام قیمت
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
 
       {/* ========================================================================= */}
-      {/* 8. FAST RFQ MODAL / DIALOG                                                */}
+      {/* MODAL 1: QUICK PRICE INQUIRY (استعلام قیمت)                               */}
       {/* ========================================================================= */}
       {rfqModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 space-y-4 text-right shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#E06518]" />
-                <h3 className="font-black text-base text-[#55565A]">درخواست استعلام قیمت (RFQ) کاشی</h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setRfqModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-right space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#E06518] flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#23262B]">استعلام قیمت و موجودی</h3>
+                  <p className="text-[11px] text-slate-500">واحد مهندسی فروش صنعت پیش</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setRfqModalOpen(false)}
-                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer text-sm font-bold"
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {rfqSuccess ? (
-              <div className="py-8 text-center space-y-3 bg-emerald-50 rounded-2xl border border-emerald-200 p-4">
-                <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
-                <h4 className="text-base font-black text-emerald-900">استعلام شما با موفقیت ثبت شد</h4>
-                <p className="text-xs text-emerald-700">
-                  کارشناس فنی بخش کاشی و سرامیک ظرف کمتر از ۳۰ دقیقه با شماره {toPersianDigits(rfqPhone)} تماس خواهد گرفت.
+            {rfqSubmitted ? (
+              <div className="py-8 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h4 className="text-base font-black text-slate-800">
+                  درخواست استعلام با موفقیت ثبت شد
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  کارشناسان فروش صنعت پیش در اسرع وقت پیش‌فاکتور و مشخصات فنی{' '}
+                  <span className="font-bold text-slate-800">{rfqItemName}</span> را برای شما ارسال می‌کنند.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleRfqSubmit} className="space-y-3.5">
+              <form onSubmit={handleRfqSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">قطعه یا موضوع استعلام:</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    قطعه مورد نظر
+                  </label>
                   <input
                     type="text"
-                    value={rfqItem}
-                    onChange={(e) => setRfqItem(e.target.value)}
-                    required
-                    className="w-full bg-[#F8F9FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-bold focus:border-[#E06518] focus:outline-none"
+                    value={rfqItemName}
+                    onChange={(e) => setRfqItemName(e.target.value)}
+                    className="w-full h-10 rounded-xl bg-slate-50 border border-slate-200 px-3 text-xs font-bold text-slate-800 focus:border-[#E06518] focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">نام و نام خانوادگی / سمت:</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      نام و نام خانوادگی
+                    </label>
                     <input
                       type="text"
-                      placeholder="مثلاً: مهندس رضایی"
-                      value={rfqName}
-                      onChange={(e) => setRfqName(e.target.value)}
-                      required
-                      className="w-full bg-[#F8F9FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:border-[#E06518] focus:outline-none"
+                      value={rfqCustomerName}
+                      onChange={(e) => setRfqCustomerName(e.target.value)}
+                      placeholder="مثال: مهندس رضایی"
+                      className="w-full h-10 rounded-xl bg-white border border-slate-200 px-3 text-xs text-slate-800 focus:border-[#E06518] focus:outline-none"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">شماره تماس همراه:</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      شماره موبایل *
+                    </label>
                     <input
                       type="tel"
-                      placeholder="۰۹۱۲..."
+                      required
                       value={rfqPhone}
                       onChange={(e) => setRfqPhone(e.target.value)}
-                      required
-                      className="w-full bg-[#F8F9FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-mono focus:border-[#E06518] focus:outline-none text-right"
+                      placeholder="0912..."
+                      dir="ltr"
+                      className="w-full h-10 rounded-xl bg-white border border-slate-200 px-3 text-xs text-right text-slate-800 focus:border-[#E06518] focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">نام کارخانه کاشی و شهر:</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    نام کارخانه / شرکت
+                  </label>
                   <input
                     type="text"
-                    placeholder="مثلاً: صنایع کاشی میبد - استان یزد"
-                    value={rfqPlantName}
-                    onChange={(e) => setRfqPlantName(e.target.value)}
-                    className="w-full bg-[#F8F9FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:border-[#E06518] focus:outline-none"
+                    value={rfqFactory}
+                    onChange={(e) => setRfqFactory(e.target.value)}
+                    placeholder="مثال: کاشی میبد / کاشی مرجان"
+                    className="w-full h-10 rounded-xl bg-white border border-slate-200 px-3 text-xs text-slate-800 focus:border-[#E06518] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">توضیحات تکمیلی یا ابعاد (اختیاری):</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    توضیحات ابعاد یا تعداد مورد نیاز
+                  </label>
                   <textarea
                     rows={2}
-                    placeholder="مثلاً: تعداد ۵۰۰ شاخه رولر قطر ۵۰ میلی‌متر طول ۳ متر"
                     value={rfqNote}
                     onChange={(e) => setRfqNote(e.target.value)}
-                    className="w-full bg-[#F8F9FA] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:border-[#E06518] focus:outline-none"
+                    placeholder="سایز، کد فنی یا شرایط کاری قطعه را بنویسید..."
+                    className="w-full rounded-xl bg-white border border-slate-200 p-3 text-xs text-slate-800 focus:border-[#E06518] focus:outline-none"
                   />
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setRfqModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    انصراف
-                  </button>
-
+                <div className="flex items-center gap-3 pt-2">
                   <button
                     type="submit"
-                    className="h-11 px-6 bg-[#E06518] hover:bg-[#C95210] text-white text-xs font-black rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    className="flex-1 h-11 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs sm:text-sm cursor-pointer transition-colors"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>ارسال درخواست پیش‌فاکتور</span>
+                    ثبت درخواست استعلام
                   </button>
+                  <Link
+                    to={`/products?q=${encodeURIComponent(rfqItemName.split('(')[0].trim())}`}
+                    className="h-11 px-4 rounded-xl border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center"
+                  >
+                    مشاهده در کاتالوگ
+                  </Link>
                 </div>
               </form>
             )}
@@ -1622,37 +1618,162 @@ export const TileCeramicIndustryPage: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 9. MOBILE STICKY QUICK ACTION BAR                                         */}
+      {/* MODAL 2: TROUBLESHOOTING PROBLEM SOLUTION MODAL                           */}
       {/* ========================================================================= */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 p-2.5 flex items-center justify-between gap-2 shadow-xl">
-        <button
-          type="button"
-          onClick={() => openRfqWithItem('استعلام سریع پیش‌فاکتور کاشی')}
-          className="flex-1 h-11 px-3 bg-[#E06518] text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+      {selectedProblem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedProblem(null)}
         >
-          <FileText className="w-3.5 h-3.5" />
-          <span>استعلام سریع قیمت (RFQ)</span>
-        </button>
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-right space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#E06518] flex items-center justify-center">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#23262B]">{selectedProblem.title}</h3>
+                  <p className="text-[11px] text-slate-500">{selectedProblem.subtitle}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProblem(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-        <a
-          href="tel:03538739900"
-          className="h-11 px-3.5 bg-[#55565A] text-white text-xs font-bold rounded-xl flex items-center gap-1 active:scale-95"
+            <div className="space-y-3 text-xs leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="font-black text-slate-800 block mb-1">نشانه و علائم در خط تولید:</span>
+                <p className="text-slate-600">{selectedProblem.symptom}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80">
+                <span className="font-black text-amber-900 block mb-1">علت فنی رخداد:</span>
+                <p className="text-amber-800">{selectedProblem.cause}</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
+                <span className="font-black text-emerald-900 block mb-1">راهکار مهندسی صنعت پیش:</span>
+                <p className="text-emerald-800">{selectedProblem.solution}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                to={`/products?q=${encodeURIComponent(selectedProblem.recommendedQuery)}`}
+                className="flex-1 h-11 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white font-bold text-xs flex items-center justify-center gap-2"
+              >
+                <span>مشاهده قطعات پیشنهادی</span>
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <Link
+                to={`/ai-consult?industry=ceramic&q=${encodeURIComponent(selectedProblem.title)}`}
+                className="h-11 px-4 rounded-xl border border-slate-200 hover:border-[#E06518] text-slate-700 hover:text-[#E06518] font-bold text-xs flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4 text-[#E06518]" />
+                <span>مشاوره با FORZA</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: STAGE TECHNICAL DETAILS / PRODUCTION LINE OVERVIEW               */}
+      {/* ========================================================================= */}
+      {(stageInfoModalOpen || videoModalOpen) && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => {
+            setStageInfoModalOpen(false);
+            setVideoModalOpen(false);
+          }}
         >
-          <PhoneCall className="w-3.5 h-3.5 text-orange-400" />
-          <span>تماس</span>
-        </a>
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 text-right space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <span className="text-[11px] font-bold text-[#E06518]">
+                  مرحله {activeStage.number} خط تولید کاشی و سرامیک
+                </span>
+                <h3 className="text-lg font-black text-[#23262B]">{activeStage.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStageInfoModalOpen(false);
+                  setVideoModalOpen(false);
+                }}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-        <a
-          href="https://wa.me/989120000000"
-          target="_blank"
-          rel="noreferrer"
-          className="h-11 px-3.5 bg-emerald-600 text-white text-xs font-bold rounded-xl flex items-center gap-1 active:scale-95"
-        >
-          <MessageCircle className="w-3.5 h-3.5" />
-          <span>واتساپ</span>
-        </a>
-      </div>
+            <div className="w-full h-52 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 relative">
+              <img
+                src={activeStage.image}
+                alt={activeStage.title}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
+                <div className="flex flex-wrap gap-2">
+                  {productionStages.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setActiveStageId(s.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                        s.id === activeStage.id
+                          ? 'bg-[#E06518] text-white'
+                          : 'bg-black/50 text-white/90 hover:bg-black/70'
+                      }`}
+                    >
+                      {s.number}. {s.shortLabel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              {activeStage.details}
+            </p>
+
+            <div className="flex items-center justify-between pt-2">
+              <Link
+                to={`/products?q=${encodeURIComponent(activeStage.query)}`}
+                className="h-10 px-5 rounded-xl bg-[#E06518] hover:bg-[#C95210] text-white text-xs font-bold flex items-center gap-2"
+              >
+                <span>مشاهده تمامی قطعات این مرحله</span>
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setStageInfoModalOpen(false);
+                  setVideoModalOpen(false);
+                }}
+                className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export default TileCeramicIndustryPage;
