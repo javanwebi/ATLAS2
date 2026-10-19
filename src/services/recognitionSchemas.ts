@@ -1,7 +1,7 @@
 const string={type:'STRING'};
 const strings={type:'ARRAY',items:string};
 export const observationSchema={type:'OBJECT',properties:{
- whatYouSee:string,detected_part_type:string,part_family_farsi:string,visual_shape:string,visual_features:strings,
+ whatYouSee:string,detected_part_type:string,part_family_farsi:string,possible_families:strings,visual_shape:string,visual_features:strings,
  detected_code_on_part:string,code_read_confidence:{type:'NUMBER'},readable_markings:strings,
  observed_specifications:{type:'ARRAY',items:{type:'OBJECT',properties:{name:string,value:string,source:{type:'STRING',enum:['visible_marking']},evidence:string},required:['name','value','source','evidence']}},
  unknown_parameters:strings,material:string,confidence:{type:'NUMBER'},technical_advice:string,

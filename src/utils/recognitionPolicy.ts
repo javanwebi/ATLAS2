@@ -30,7 +30,7 @@ function normalizeCode(value: unknown) {
   return String(value ?? '').trim().replace(/[۰-۹]/g, d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).toLowerCase();
 }
 /** A visual confidence percentage is not proof of SKU identity. */
-export function finalizeRecognition(result: any, catalog: ReturnType<typeof recognitionCatalog>, recognition: any = {}, aiAvailable=true) {
+export function finalizeRecognition(result: any, catalog: ReturnType<typeof recognitionCatalog>, recognition: any = {}, aiAvailable=true, dimensionProofCodes:ReadonlySet<string>=new Set()) {
   const byCode=new Map(catalog.map(item=>[normalizeCode(item.code),item]));
   const imageOwners=new Map<string, Set<string>>();
   for (const item of catalog) if(item.image && item.imageScope === 'variant') {
@@ -44,12 +44,13 @@ export function finalizeRecognition(result: any, catalog: ReturnType<typeof reco
     const readCode=normalizeCode(recognition.detected_code_on_part);
     const codeProof=readCode === normalizeCode(item.code) && Number.isFinite(Number(recognition.code_read_confidence)) && Number(recognition.code_read_confidence)>=90;
     const photoProof=item.imageIdentityVerified && item.imageScope === 'variant' && imageOwners.get(item.image)?.size===1 && Number(candidate.visualDistance)<=0.08;
-    const exact=codeProof || photoProof;
+    const dimensionProof=dimensionProofCodes.has(item.code);
+    const exact=!candidate.dimensionMismatch && (codeProof || photoProof || dimensionProof);
     const scannedPhoto=(result.catalogImageMatches || []).find((photo:any)=>photo.imageId===candidate.matchedImageId && photo.bindings?.some((binding:any)=>binding.code===item.code));
     return [{...candidate, code:item.code,name:item.name,brand:item.brand,specs:item.specs,image:scannedPhoto?.image || item.image || undefined,
-      imageScope:item.imageScope,identityEvidence:codeProof ? 'read-inventory-code' : photoProof ? 'dedicated-catalogue-photo' : 'similarity-only',
+      imageScope:item.imageScope,identityEvidence:codeProof ? 'read-inventory-code' : photoProof ? 'dedicated-catalogue-photo' : dimensionProof ? 'unique-registered-dimensions' : 'similarity-only',
       visualVerdict:exact ? 'exact_match' : 'very_similar',
-      matchReason:exact ? 'تطبیق با کد خوانده‌شده یا عکس اختصاصی همان کالا؛ کنترل نهایی ابعاد لازم است.' : 'شباهت ظاهری یا فنی؛ هویت دقیق کد از تصویر تأیید نشده است.',
+      matchReason:exact ? dimensionProof ? 'کد منطبق با تمام اندازه‌های اعلامی و مشخصات ثبت‌شده در خانوادهٔ تصویری؛ کنترل نهایی شرایط نصب لازم است.' : 'تطبیق با کد خوانده‌شده یا عکس اختصاصی همان کالا؛ کنترل نهایی ابعاد لازم است.' : 'شباهت ظاهری یا فنی؛ هویت دقیق کد از تصویر تأیید نشده است.',
       visualExplanation:exact ? 'شاهد تطبیق کد ثبت شده است.' : 'این پیشنهاد بر پایهٔ شباهت است؛ یکسان‌بودن قطعه ثابت نشده است.',
       technicalEvidence:(candidate.technicalEvidence || []).filter((text:unknown)=>typeof text==='string' && !/عین|قطعی|۱۰۰|100/.test(text)),
       visualVerdictFarsi:exact ? 'تطبیق کد کالا' : 'محصول مشابه؛ کد دقیق تأیید نشده',
@@ -63,7 +64,7 @@ export function finalizeRecognition(result: any, catalog: ReturnType<typeof reco
       if (seen.has(item.code) || !families.has(item.familyCode)) continue;
       similarCandidates.push({code:item.code,name:item.name,brand:item.brand,specs:item.specs,image:item.image || undefined,imageScope:item.imageScope,
         identityEvidence:'similarity-only',visualVerdict:'very_similar',visualVerdictFarsi:'گزینهٔ هم‌خانواده',distinction:'گزینهٔ هم‌خانواده؛ تطبیق تصویری و سازگاری فنی آن تأیید نشده است.'} as any);
-      if(similarCandidates.length>=4)break;
+
     }
   }
   const exact=matchedProducts.length>0;

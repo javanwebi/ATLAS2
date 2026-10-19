@@ -1,3 +1,4 @@
+import {measurementError} from '../../utils/partMeasurements';
 import { memberPath } from "../storefront/MemberAccess";
 import React, { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -124,6 +125,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [measurements,setMeasurements]=useState<Record<string,string>>({});
   // Analysis result & error
   const [analysisResult, setAnalysisResult] =
     useState<AiPartAnalysisResult | null>(null);
@@ -191,6 +193,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
     if (selectedImage?.startsWith("blob:")) URL.revokeObjectURL(selectedImage);
     setErrorMessage("");
     setUploadedImageUrl(null);
+    setAnalysisResult(null);setMeasurements({});
     setSelectedImage(URL.createObjectURL(file));
     setMimeType(file.type || "image/jpeg");
     if (isUsingCamera) stopCamera();
@@ -208,6 +211,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
   // Preset sample loader
   const loadPreset = (preset: IndustrialPresetSample) => {
     if (selectedImage?.startsWith("blob:")) URL.revokeObjectURL(selectedImage);
+    setAnalysisResult(null);setMeasurements({});
     setSelectedImage(preset.imageUrl);
     setUploadedImageUrl(null);
     setMimeType("image/jpeg");
@@ -221,8 +225,8 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
     setFeatures(preset.features);
     setErrorMessage("");
     if (isUsingCamera) stopCamera();
-    // Move to step 2 directly with preset data for quick flow
-    setCurrentStep(2);
+    // Presets follow the same observation and measurement flow as uploads.
+    setCurrentStep(1);
   };
 
   // Camera start / stop / capture
@@ -279,6 +283,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         if (selectedImage?.startsWith("blob:"))
           URL.revokeObjectURL(selectedImage);
+        setAnalysisResult(null);setMeasurements({});
         setSelectedImage(dataUrl);
         setUploadedImageUrl(null);
         setMimeType("image/jpeg");
@@ -302,7 +307,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
     setPitch("");
     setApplication("");
     setFeatures("");
-    setAnalysisResult(null);
+    setAnalysisResult(null);setMeasurements({});
     setErrorMessage("");
     setPendingStage("refined");
     setLastStage("refined");
@@ -311,11 +316,14 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
 
   // Navigation handlers
   const goToStep2 = () => {
+    if(selectedImage && !analysisResult?.requiredMeasurements){void handleAnalyze("quick");return;}
     setErrorMessage("");
     setCurrentStep(2);
   };
 
   const goToStep3 = () => {
+    const issue=analysisResult?.requiredMeasurements && measurementError(analysisResult.requiredMeasurements,measurements);
+    if(issue){setErrorMessage(issue);return;}
     if (!length && !width && !selectedImage) {
       setErrorMessage(
         "لطفاً طول و عرض تقریبی را وارد نمایید یا در مرحله قبل تصویر بارگذاری کنید.",
@@ -344,6 +352,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
       return;
     }
 
+    if(stage==="refined" && analysisResult?.requiredMeasurements){const issue=measurementError(analysisResult.requiredMeasurements,measurements);if(issue){setErrorMessage(issue);setCurrentStep(2);return;}}
     setErrorMessage("");
     setPendingStage(stage);
     setAnalysisProgress(0);
@@ -362,6 +371,8 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
         application: application.trim() || undefined,
         features: features.trim() || undefined,
         stage,
+        observationOnly:stage==="quick",
+        measurements:stage==="refined" && analysisResult?.requiredMeasurements ? measurements : undefined,
       }, progress => {
         setScanCounts(progress);
         setAnalysisProgress(progress.total ? Math.floor(progress.compared*100/progress.total) : 0);
@@ -370,7 +381,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
 
       setAnalysisResult(result);
       setLastStage(result.stage || stage);
-      setCurrentStep("results");
+      setCurrentStep(result.observationOnly ? 2 : "results");
     } catch (err: any) {
       console.error(err);
       setErrorMessage(
@@ -957,7 +968,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                 <div className="text-center space-y-1">
                   <h4 className="text-base font-black text-[#55565A] flex items-center justify-center gap-2">
                     <Ruler className="w-5 h-5 text-[#E06518]" />
-                    <span>مرحله دوم: مشخص کردن طول و عرض محصول</span>
+                    <span>مرحله دوم: مشخصات لازم برای تطبیق کد</span>
                   </h4>
                   <p className="text-xs text-slate-500">
                     ابعاد فیزیکی قطعه را برحسب میلی‌متر وارد نمایید تا انطباق
@@ -993,6 +1004,21 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                   </div>
                 )}
 
+                {analysisResult?.requiredMeasurements ? <>
+                  <div className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 space-y-2" role="status">
+                    <h5 className="font-bold text-sm text-slate-800">تحلیل قطعه</h5>
+                    <p className="text-sm leading-7 text-slate-700">{analysisResult.summary.visualAnalysis}</p>
+                    <p className="text-xs leading-6 text-slate-500">مشخصات زیر برای این نوع قطعه لازم‌اند. هر مورد را اندازه بگیرید یا «مشخص نیست» را انتخاب کنید؛ با مقدار نامعلوم فقط مشابه‌ها نمایش داده می‌شوند.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {analysisResult.requiredMeasurements.map(field=><div key={field.id} className="rounded-2xl border border-slate-200 p-4 space-y-2 bg-slate-50/70">
+                      <label htmlFor={`part-${field.id}`} className="text-sm font-bold text-slate-700">{field.label}{field.unit ? ` (${field.unit})` : ''}</label>
+                      <input id={`part-${field.id}`} type={field.kind==='number' ? 'number' : 'text'} min={field.kind==='number' ? '0' : undefined} step="any" dir="auto" disabled={measurements[field.id]==='unknown'} value={measurements[field.id]==='unknown' ? '' : measurements[field.id] || ''} onChange={event=>setMeasurements(previous=>({...previous,[field.id]:event.target.value}))} className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm disabled:bg-slate-100 focus:border-orange-500 outline-none" />
+                      <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={measurements[field.id]==='unknown'} onChange={event=>setMeasurements(previous=>({...previous,[field.id]:event.target.checked ? 'unknown' : ''}))} />مشخص نیست / کاربرد ندارد</label>
+                      <p className="text-xs leading-5 text-slate-500">{field.hint}</p>
+                    </div>)}
+                  </div>
+                </> : <>
                 {/* Dimensions Input Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Length Input */}
@@ -1071,6 +1097,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                   </p>
                 </div>
 
+                </>}
                 {/* Step 2 Actions (Back & Next) */}
                 <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
                   <button
@@ -1287,7 +1314,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                       </span>
                       <span className="text-xs sm:text-sm font-bold text-[#55565A]">
-                        شناسایی و آنالیز هوشمند قطعه
+                        {pendingStage==="quick" ? "تحلیل قطعه و تعیین مشخصات لازم" : "تطبیق تصویر و مشخصات با کالاها"}
                       </span>
                       <span className="hidden sm:inline text-slate-300">|</span>
                       <span className="hidden sm:inline text-[11px] text-slate-400">
@@ -1560,16 +1587,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                       </div>
                     )}
                     <div className="flex-1 space-y-2 min-w-0">
-                      {analysisResult.summary.whatYouSee && (
-                        <p className="text-xs text-teal-200 leading-relaxed bg-teal-500/10 border border-teal-500/30 rounded-xl p-2">
-                          <strong>هوش مصنوعی در تصویر می‌بیند: </strong>
-                          {analysisResult.summary.whatYouSee}
-                        </p>
-                      )}
-                      {/* Visual Analysis Explanation */}
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {analysisResult.summary.visualAnalysis}
-                      </p>
+                      <p className="text-sm text-slate-100 leading-7"><strong>تحلیل قطعه: </strong>{analysisResult.summary.visualAnalysis}</p>
                     </div>
                   </div>
                 </div>
@@ -2022,7 +2040,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                         </div>
                         <div className="space-y-1.5 flex-1">
                           <div className="font-black text-base text-[#55565A]">
-                            می‌تونیم براتون بسازیم 🔧
+                            درخواست بررسی تخصصی قطعه 🔧
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed">
                             با مشخصات فعلی، قطعهٔ کاملاً منطبق در کاتالوگ آماده

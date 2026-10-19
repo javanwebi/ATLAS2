@@ -1,3 +1,4 @@
+import type {PartMeasurement} from '../utils/partMeasurements';
 import { Product } from '../types';
 import { getProductByCode } from '../data/mockGenerator';
 import { getProductImageUrl } from '../assets/imagesproducts';
@@ -17,6 +18,8 @@ export interface AiPartAnalysisRequest {
   pitch?: number;
   application?: string;
   features?: string;
+  observationOnly?:boolean;
+  measurements?:Record<string,string>;
   stage?: AiAnalysisStage;
 }
 
@@ -70,6 +73,8 @@ export interface MatchedPartItem {
 export interface ImageScanProgress {stage:'preparing'|'scanning'|'verifying'|'complete';total:number;compared:number;failed:number;}
 export interface CatalogPhotoMatch {imageId:string;image:string;label:string;score:number;reason:string;relation?:'very_similar'|'related';familyNames?:string[];bindings:{familyCode:string;code?:string;verified:boolean}[];}
 export interface AiPartAnalysisResult {
+  observationOnly?:boolean;
+  requiredMeasurements?:PartMeasurement[];
   success: boolean;
   isAiGenerated: boolean;
   stage?: AiAnalysisStage;

@@ -4,11 +4,11 @@ const normalized=(value:unknown)=>String(value || '').normalize('NFKC').replace(
 export function catalogRecognitionContext(products:Product[],observation:any){
  const byFamily=new Map(products.filter(p=>p.active!==false).map(p=>[p.code,p]));
  const read=Number(observation?.code_read_confidence)>=85 ? normalized(observation?.detected_code_on_part) : '';
- const family=normalized(observation?.part_family_farsi);
+ const families=[observation?.part_family_farsi,...(Array.isArray(observation?.possible_families) ? observation.possible_families.slice(0,5) : [])].map(normalized).filter(value=>value.length>=4);
  const sameText=(text:unknown)=>{const n=normalized(text);return Boolean(read && read.length>=3 && (' '+n+' ').includes(' '+read+' '));};
  const evidenceFamilies=new Set(products.filter(p=>p.active!==false && (
   sameText(p.code)||sameText(p.name)||(p.variants || []).some(v=>v.active!==false&&(sameText(v.code)||sameText(v.name)||sameText(v.model))) ||
-  (family.length>=4 && normalized(p.name).includes(family))
+  families.some(family=>normalized(p.name).includes(family))
  )).map(p=>p.code));
  return {
   supplement:(images:CatalogImageRecord[])=>images.filter(row=>row.bindings.some(binding=>evidenceFamilies.has(binding.familyCode))).slice(0,24),
