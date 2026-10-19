@@ -566,7 +566,16 @@ const GITHUB_CATALOG_IMAGES_REPO = 'https://raw.githubusercontent.com/javanweb/i
 const CATALOG_IMAGES_CACHE_DIR = process.env.CATALOG_IMAGES_CACHE_DIR || path.join(process.cwd(), '.cache', 'catalog_images');
 const catalogVisualIndex=new CatalogVisualIndex(process.env.CATALOG_VISUAL_INDEX_PATH || path.join(process.cwd(),'.cache','catalog-visual-index.json'));
 let nextVisualIndexBuild=0;
+let nextEmbeddingSlot=0;
 async function embedCatalogImages(buffers:Buffer[],publishImage:ImagePublisher):Promise<number[][]>{
+ // Batch items consume provider quota individually. Pace the aggregate across all builders.
+ const rate=Number(process.env.VISUAL_EMBEDDING_IMAGES_PER_MINUTE || 90);
+ const perMinute=Number.isFinite(rate) ? Math.max(6,Math.min(90,rate)) : 90;
+ const slot=Math.max(Date.now(),nextEmbeddingSlot);
+ nextEmbeddingSlot=slot+buffers.length*60000/perMinute;
+ const delay=slot-Date.now();
+ if(delay>0)await new Promise(resolve=>setTimeout(resolve,delay));
+
  const parts=buffers.map(buffer=>({inlineData:{mimeType:'image/jpeg',data:buffer.toString('base64')}}));
  const key=getGeminiKey();
  if(getPartRecognitionWorkerUrl()){
