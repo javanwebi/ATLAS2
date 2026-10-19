@@ -12,6 +12,8 @@ test('same catalogue photograph survives upload compression and alpha compositin
  assert.equal(sameCatalogPhotograph(first,await photoFingerprint(different)),false);
  const blank=await sharp({create:{width:400,height:400,channels:3,background:'#fff'}}).png().toBuffer();
  assert.equal(sameCatalogPhotograph(await photoFingerprint(blank),await photoFingerprint(blank)),false);
+ const colour=await sharp({create:{width:400,height:400,channels:3,background:'#f46b20'}}).png().toBuffer();
+ assert.equal(sameCatalogPhotograph(await photoFingerprint(colour),await photoFingerprint(colour)),false);
 });
 test('an identical re-upload ranks above model suggestions without claiming a warehouse SKU',async()=>{
  const {scanEveryCatalogImage}=await import('../src/services/exhaustiveImageScan');

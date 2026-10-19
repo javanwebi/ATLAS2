@@ -6,8 +6,9 @@ export async function photoFingerprint(input:Buffer):Promise<PhotoFingerprint>{
  const flattened=await sharp(input).rotate().flatten({background:'#fff'}).png().toBuffer();
  const meta=await sharp(flattened).metadata();
  const pixels=await sharp(flattened).resize(96,96,{fit:'fill'}).toColourspace('srgb').removeAlpha().raw().toBuffer();
- const mean=pixels.reduce((sum,v)=>sum+v,0)/pixels.length;
- const variance=pixels.reduce((sum,v)=>sum+(v-mean)**2,0)/pixels.length;
+ const means=[0,0,0];
+ for(let i=0;i<pixels.length;i++)means[i%3]+=pixels[i]/(pixels.length/3);
+ const variance=pixels.reduce((sum,v,i)=>sum+(v-means[i%3])**2,0)/pixels.length;
  return {pixels,aspect:meta.width!/meta.height!,variance};
 }
 export function sameCatalogPhotograph(a:PhotoFingerprint,b:PhotoFingerprint):boolean{
