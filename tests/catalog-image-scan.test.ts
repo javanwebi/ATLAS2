@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { buildCatalogImageCorpus,officialImageFile,corpusFingerprint } from '../src/services/catalogImageCorpus';
-import { scanEveryCatalogImage } from '../src/services/exhaustiveImageScan';
+import { scanEveryCatalogImage, hasPhysicalEvidence } from '../src/services/exhaustiveImageScan';
 import { RecognitionJobs } from '../src/services/recognitionJobs';
 import type { Product } from '../src/types';
 
@@ -22,7 +22,7 @@ test('all 869 photos reach vision and a hit in the final batch survives full-res
  const image=await photo();const images=buildCatalogImageCorpus([]).map(r=>({...r,id:'test-'+r.id,revision:'fixture-869'}));let scanned=0;
  const result=await scanEveryCatalogImage({query:image,images,readImage:async()=>image,vision:async parts=>{
    const prompt=parts[0].text;
-   if(prompt.includes('عکس اول مشتری است.'))return JSON.stringify({comparisons:[{n:1,similar:true,score:93,reason:'final item checked'}]});
+   if(prompt.includes('عکس اول مشتری است.'))return JSON.stringify({comparisons:[{n:1,similar:true,score:93,reason:'final item checked',queryType:'gear',candidateType:'gear',sameType:true,matchingFeatures:['helical teeth','central bore'],contradictions:[],checks:{geometry:'match',holes:'match',teeth:'unknown',connections:'unknown',markings:'unknown'}}]});
    const count=Number(prompt.match(/شامل (\d+)/)[1]);scanned+=count;
    return JSON.stringify({picks:scanned===869 ? [{n:count,score:95,reason:'last catalogue photo'}] : []});
  }});
@@ -59,4 +59,13 @@ test('both Worker entrypoints forward every comparison image instead of only the
    const data=await response.json();assert.equal(data.protocol,'atlas-multimodal-v1');assert.equal(data.choices[0].message.content,'{"picks":[]}');
   }finally{globalThis.fetch=original;}
  }
+});
+
+test('physical contradictions and unsupported confidence fail closed',()=>{
+ const evidence={similar:true,sameType:true,queryType:'helical gear',candidateType:'gear',matchingFeatures:['helical teeth','central bore'],contradictions:[],checks:{geometry:'match',holes:'match',teeth:'unknown',connections:'unknown',markings:'unknown'}};
+ assert.equal(hasPhysicalEvidence(evidence),true);
+ assert.equal(hasPhysicalEvidence({...evidence,checks:{...evidence.checks,teeth:'mismatch'}}),false);
+ assert.equal(hasPhysicalEvidence({...evidence,contradictions:['straight teeth instead of helical']}),false);
+ assert.equal(hasPhysicalEvidence({similar:true,score:99}),false);
+ assert.equal(hasPhysicalEvidence({...evidence,matchingFeatures:['round','round']}),false);
 });

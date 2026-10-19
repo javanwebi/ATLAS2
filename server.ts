@@ -4086,10 +4086,9 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
   // Keep each selected photograph; a family association never becomes a guessed SKU.
   const searchResults = await searchCatalogProducts(uploaded.buffer, raw, prompt);
   const scannedSkuMatches=imageScan.matches.flatMap(photo=>photo.bindings.filter(binding=>binding.code && inventoryCodes.has(binding.code)).map(binding=>({code:binding.code,image:photo.image,matchedImageId:photo.imageId,similarityScore:photo.score,matchReason:photo.reason,visualVerdict:'very_similar'})));
-  if(imageScan.coverage.complete || imageScan.matches.length) {
-    searchResults.matchedProducts=searchResults.matchedProducts.filter(candidate=>String(raw?.detected_code_on_part || '').trim()===candidate.code && Number(raw?.code_read_confidence)>=90);
-    searchResults.similarCandidates=scannedSkuMatches;
-  } else searchResults.similarCandidates=[...scannedSkuMatches,...searchResults.similarCandidates];
+  // Never reintroduce unverified hash/text suggestions when the image scan fails.
+  searchResults.matchedProducts=[];
+  searchResults.similarCandidates=scannedSkuMatches;
   let exactMatches = canonicalizeCatalogMatchList(searchResults.matchedProducts || []);
   let similarCandidates = canonicalizeCatalogMatchList(searchResults.similarCandidates || [])
     .filter((candidate) => !exactMatches.some((exact) => exact.code === candidate.code));
@@ -4102,37 +4101,6 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
 
   let isTrueExactProduct = isIdenticalFile;
   let exactVisualMatch = isIdenticalFile;
-
-  // Visual side-by-side verification with Gemini Vision on all candidate images:
-  // "تطبیق تصویر مشتری باتصاویر کاتالوگ اولین اولویت اینه که تصویر را با تصویر مشتری تطبیق بدهد و محصولاتی که نشون میدهد باید شکل و شمایل مشابه خیلی تشابه به تصویر مشتری داشته باشد"
-  if (aiAvailable && !imageScan.coverage.complete && !isIdenticalFile && (apiKey || getPartRecognitionWorkerUrl()) && uploaded.buffer && uploaded.buffer.length > 0) {
-    const candidatePool = [...exactMatches, ...similarCandidates].slice(0, 8);
-    if (candidatePool.length > 0) {
-      try {
-        const ai = apiKey ? new GoogleGenAI({apiKey}) : null;
-        const verifiedResult = await verifyCandidatesVisuallyWithGemini(
-          ai,
-          uploaded.buffer,
-          candidatePool,
-          String(raw?.detected_part_type || raw?.visual_shape || 'قطعه صنعتی'),
-          publishImage
-        );
-
-        const vMatched = canonicalizeCatalogMatchList(verifiedResult.matched || []);
-        const vSimilar = canonicalizeCatalogMatchList(verifiedResult.similar || [])
-          .filter((candidate) => !vMatched.some((exact) => exact.code === candidate.code));
-
-        if (vMatched.length > 0 || vSimilar.length > 0) {
-          exactMatches = vMatched;
-          similarCandidates = [...vSimilar, ...similarCandidates.filter(c => !vMatched.some(m => m.code === c.code) && !vSimilar.some(m => m.code === c.code))].slice(0, 6);
-          isTrueExactProduct = verifiedResult.hasExact && exactMatches.length > 0;
-          exactVisualMatch = isTrueExactProduct;
-        }
-      } catch (err: any) {
-        console.warn('[AI Search Worker] Visual verification failed, using ranked pool:', err?.message);
-      }
-    }
-  }
 
   const hasProducts = exactMatches.length > 0 || similarCandidates.length > 0;
   const aiConfidence = isTrueExactProduct
