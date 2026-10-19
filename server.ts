@@ -1,3 +1,4 @@
+import {partFamilyCompatible} from './src/utils/partFamilyCompatibility';
 import {partDimensionMatch} from './src/utils/partDimensionMatch';
 import {partMeasurements,measurementError,measurementText,persianPartAnalysis} from './src/utils/partMeasurements';
 import {observationSchema} from './src/services/recognitionSchemas';
@@ -4176,7 +4177,14 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
         return (await generateWithModelCascade(direct,[{role:'user',parts}],{responseMimeType:'application/json',responseSchema:schema},'Full catalogue image scan',GEMINI_MODELS,45000)).text;
       }});
   }
-  imageScan.matches=imageScan.matches.map(photo=>({...photo,familyNames:context.familyNames(corpus.find(row=>row.id===photo.imageId)!)}));
+  const registeredFamilies=new Map(recognitionProducts().map(product=>[product.code,product.name]));
+  imageScan.matches=imageScan.matches.map(photo=>{
+    const bindings=photo.bindings.filter(binding=>partFamilyCompatible(registeredFamilies.get(binding.familyCode) || '',raw));
+    const conflicting=bindings.length!==photo.bindings.length;
+    if(conflicting)console.warn('[Catalogue family conflict]',photo.imageId);
+    const row={...corpus.find(row=>row.id===photo.imageId)!,bindings};
+    return {...photo,bindings,label:conflicting ? 'تصویر کاتالوگی مشابه؛ عنوان و اتصال کد نیازمند بازبینی است.' : photo.label,familyNames:context.familyNames(row)};
+  });
   // Keep each selected photograph; a family association never becomes a guessed SKU.
   const searchResults: {matchedProducts:any[];similarCandidates:any[];exactVisualMatch:boolean} = {matchedProducts:[],similarCandidates:[],exactVisualMatch:false};
   const candidatesByCode=new Map<string,any>();

@@ -29,3 +29,19 @@ test('a dimension conflict overrides a read code; server-calculated unique dimen
  const conflict=finalizeRecognition({summary:{},matchedProducts:[{code:'100',dimensionMismatch:true}]},catalog,{detected_code_on_part:'100',code_read_confidence:99});assert.equal(conflict.matchedProducts.length,0);
  const result=finalizeRecognition({summary:{},matchedProducts:[],similarCandidates:[{code:'100'},{code:'101'}]},catalog,{},true,new Set(['100']));assert.equal(result.matchedProducts[0].code,'100');assert.equal(result.similarCandidates[0].code,'101');
 });
+
+test('the matching ring photograph cannot lend an incorrectly registered spring SKU to the result',async()=>{
+ const {partFamilyCompatible}=await import('../src/utils/partFamilyCompatibility');
+ assert.equal(partFamilyCompatible('فنر',{detected_part_type:'واشر تخت',part_family_farsi:'واشرها و آب‌بندها'}),false);
+ assert.equal(partFamilyCompatible('چرخ دنده',{detected_part_type:'Helical Gear'}),true);
+ assert.equal(partFamilyCompatible('تسمه گرد',{detected_part_type:'حلقه آب‌بندی',possible_families:['تسمه گرد']}),true);
+});
+test('the proven ring photo stays searchable but is no longer assigned to the spring family or labelled a spring preset',async()=>{
+ const {USER_PRODUCTS_RAW}=await import('../src/data/userProducts');
+ const {buildCatalogImageCorpus}=await import('../src/services/catalogImageCorpus');
+ const {INDUSTRIAL_PRESET_SAMPLES}=await import('../src/data/recognitionSamples');
+ assert.equal(USER_PRODUCTS_RAW.find(p=>p.code==='FAM-32193')?.images.length,0);
+ const photo=buildCatalogImageCorpus(USER_PRODUCTS_RAW).find(p=>p.id==='e(1).png')!;
+ assert.ok(photo);assert.equal(photo.bindings.some(b=>b.familyCode==='FAM-32193'),false);
+ assert.equal(INDUSTRIAL_PRESET_SAMPLES[0].title,'حلقه تخت');
+});

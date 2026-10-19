@@ -6,6 +6,7 @@ const thickness=field('thickness','ضخامت / ارتفاع','ضخامت خود
 const code=field('partCode','کد یا مدل روی قطعه','فقط نوشته واقعی روی قطعه؛ واترمارک عکس کد کالا نیست.','','text');
 export function partMeasurements(observation:any):PartMeasurement[]{
  const type=[observation?.detected_part_type,observation?.part_family_farsi,observation?.visual_shape].join(' ').toLowerCase();
+ if(/spring|فنر/.test(type))return [outer,field('wireDiameter','قطر مفتول','قطر سیم فنر را اندازه بگیرید.'),field('length','طول آزاد فنر','طول بدون بار و فشار.'),field('coils','تعداد حلقه‌ها','تعداد حلقه‌های فنر.','عدد'),code];
  if(/coupling|spider|کوپلینگ|خورشیدی/.test(type))return [outer,inner,thickness,field('lobes','تعداد پره‌ها / بازوها','فقط تعداد پره‌های قطعه.','عدد'),code];
  if(/gear|sprocket|چرخ.?دنده|پینیون|زنجیرچرخ/.test(type))return [outer,inner,thickness,field('toothCount','تعداد دندانه','تعداد دندانه سالم؛ اگر قابل شمارش نیست، مشخص نیست را انتخاب کنید.','عدد'),field('module','مدول / گام','مدول یا گام درج‌شده در نقشه؛ از عکس حدس نزنید.'),code];
  if(/belt|تسمه/.test(type))return [field('length','طول تسمه','طول داخلی، خارجی یا مؤثر را در توضیحات مشخص کنید.'),field('width','عرض تسمه','پهنای پشت تسمه یا مقطع.'),thickness,field('pitch','گام دندانه','برای تسمه دندانه‌دار؛ در سایر مدل‌ها مشخص نیست را انتخاب کنید.'),field('profile','پروفیل تسمه','مانند SPA، SPB، A، 8M یا PK.','','text'),code];
@@ -24,9 +25,9 @@ export function measurementText(fields:PartMeasurement[],values:Record<string,st
 }
 const persian=(value:unknown)=>typeof value==='string' && /[\u0600-\u06ff]/.test(value);
 export function persianPartAnalysis(raw:any):string{
- if(persian(raw?.whatYouSee))return raw.whatYouSee;
  const type=String(raw?.detected_part_type || '').toLowerCase();
  const family=persian(raw?.part_family_farsi) ? raw.part_family_farsi : /coupling|spider/.test(type) ? 'واسط الاستومری کوپلینگ' : /gear/.test(type) ? 'چرخ‌دنده' : /belt/.test(type) ? 'تسمه' : /seal|ring|washer|gasket/.test(type) ? 'حلقه یا قطعه آب‌بندی' : 'قطعه صنعتی';
  const features=(raw?.visual_features || []).filter(persian);
- return `قطعهٔ اصلی در گروه «${family}» شناسایی اولیه شده است.${features.length ? ' ویژگی‌های قابل مشاهده: '+features.join('، ')+'.' : ''} ابعاد، جنس دقیق و کد کالا تنها از ظاهر تأیید نمی‌شوند؛ مشخصات مرحله بعد برای تطبیق لازم‌اند.`;
+ const unknown=(raw?.unknown_parameters || []).filter(persian);
+ return `شناسایی اولیه: ${family}. ${features.length ? 'ویژگی‌های قابل مشاهده: '+[...new Set(features)].join('، ')+'. ' : 'جزئیات شکل برای تأیید نوع قطعه کافی نیست. '} ${unknown.length ? 'موارد نامشخص: '+unknown.join('، ')+'. ' : 'ابعاد، جنس دقیق و کد کالا از ظاهر تأیید نشده‌اند. '}برای انتخاب کد، اندازه‌های مرحله بعد را با مشخصات ثبت‌شده مقایسه می‌کنیم؛ ظاهر مشابه به‌تنهایی تطبیق دقیق نیست.`;
 }

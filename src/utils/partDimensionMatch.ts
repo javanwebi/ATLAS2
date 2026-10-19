@@ -1,6 +1,6 @@
 import type {PartMeasurement} from './partMeasurements';
 const normalize=(value:unknown)=>String(value || '').replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,' ').toLowerCase().trim();
-const aliases:Record<string,RegExp>={outerDiameter:/^(قطر (خارجی|بیرونی)|outer diameter|outside diameter|od)$/,innerDiameter:/^(قطر (داخلی|سوراخ)|قطر سوراخ مرکزی|inner diameter|bore|id)$/,thickness:/^(ضخامت|ارتفاع|thickness|height)$/,width:/^(عرض|width)$/,length:/^(طول|length)$/,pitch:/^(گام|pitch)$/,module:/^(مدول|module)$/,toothCount:/^(تعداد دندانه|teeth|tooth count)$/,lobes:/^(تعداد پره|تعداد بازو|lobes)$/,profile:/^(پروفیل|شکل مقطع|profile)$/};
+const aliases:Record<string,RegExp>={wireDiameter:/^(قطر مفتول|wire diameter)$/,coils:/^(تعداد حلقه|coils)$/,outerDiameter:/^(قطر (خارجی|بیرونی)|outer diameter|outside diameter|od)$/,innerDiameter:/^(قطر (داخلی|سوراخ)|قطر سوراخ مرکزی|inner diameter|bore|id)$/,thickness:/^(ضخامت|ارتفاع|thickness|height)$/,width:/^(عرض|width)$/,length:/^(طول|length)$/,pitch:/^(گام|pitch)$/,module:/^(مدول|module)$/,toothCount:/^(تعداد دندانه|teeth|tooth count)$/,lobes:/^(تعداد پره|تعداد بازو|lobes)$/,profile:/^(پروفیل|شکل مقطع|profile)$/};
 export function partDimensionMatch(specs:{key:string;value:string}[],fields:PartMeasurement[],values:Record<string,string>={}){
  const matches:string[]=[],mismatches:string[]=[],unknown:string[]=[];
  for(const field of fields.filter(f=>f.id!=='partCode')){
