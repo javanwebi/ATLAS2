@@ -583,7 +583,12 @@ function warmCatalogVisualIndex(corpus:ReturnType<typeof buildCatalogImageCorpus
  nextVisualIndexBuild=Date.now()+60000;
  void catalogVisualIndex.update(corpus,row=>getCatalogImageBuffer(row.url,row.revision),buffers=>embedCatalogImages(buffers,publishImage))
  .then(()=>console.log('[Visual index]',JSON.stringify(catalogVisualIndex.coverage(corpus))))
- .catch(()=>console.warn('[Visual index] Index incomplete; exhaustive comparison remains active.'));
+ .catch((error)=>{
+   const reason=error instanceof RecognitionServiceError ? error.code : String(error?.message || 'index_unavailable').slice(0,120);
+   console.warn('[Visual index] Incomplete:',reason);
+   // Resume persisted batches after transient failures or provider rate limits.
+   setTimeout(()=>warmCatalogVisualIndex(buildCatalogImageCorpus(recognitionProducts(),loadCatalogOverridesDb().updatedAt),publishImage),65000).unref();
+ });
 }
 
 // Ensure catalog images cache folder exists

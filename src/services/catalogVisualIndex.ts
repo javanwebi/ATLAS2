@@ -36,7 +36,7 @@ export class CatalogVisualIndex {
    const outcomes=await Promise.allSettled(Array.from({length:Math.min(3,Math.ceil(missing.length/6))},async()=>{
    try{while(next<missing.length && !stopped){
     const offset=next;next+=6;const rows=missing.slice(offset,offset+6);
-    const loaded=await Promise.all(rows.map(async row=>{const bytes=await read(row);if(!bytes)throw new Error('Catalogue image unavailable');return sharp(bytes).rotate().resize(768,768,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:92}).toBuffer();}));
+    const loaded=await Promise.all(rows.map(async row=>{const bytes=await read(row);if(!bytes)throw new Error('Catalogue image unavailable: '+row.id);return sharp(bytes).rotate().resize(768,768,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:92}).toBuffer();}));
     const vectors=await embed(loaded);if(vectors.length!==rows.length)throw new Error('Embedding count mismatch');
     const entries=vectors.map((v,i)=>({id:rows[i].id,signature:signature(rows[i]),vector:normalized(v)}));
     for(const entry of entries)this.entries.set(entry.id,{signature:entry.signature,vector:entry.vector});
