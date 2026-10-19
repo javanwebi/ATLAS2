@@ -705,9 +705,13 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
   ) => {
     setDraftFamily(prev => {
       if (!prev) return prev;
-      const nextGallery = (prev.galleryImages || []).map(img =>
-        img.id === imgId ? updater(img) : img
-      );
+      const nextGallery = (prev.galleryImages || []).map(img => {
+        if (img.id !== imgId) return img;
+        const next = updater(img);
+        if (next.url !== img.url || next.variantCode !== img.variantCode || next.scope !== 'variant')
+          next.identityVerified = false;
+        return next;
+      });
       return {
         ...prev,
         galleryImages: nextGallery,
@@ -2882,7 +2886,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                                 g.variantCode === currentEditingVariant.code
                             ).length === 0 && (
                               <span className="text-xs text-slate-500">
-                                تصویر اختصاصی برای این کد ثبت نشده است (از تصویر عمومی خانواده استفاده می‌کند).
+                                تصویر اختصاصی برای این کد ثبت نشده است. تصویر عمومی خانواده شاهد تطبیق همین کد نیست.
                               </span>
                             )}
                           </div>
@@ -3166,6 +3170,14 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                                   </select>
                                 </div>
 
+                                {img.scope === 'variant' && img.variantCode && (
+                                  <label className="flex items-start gap-2 text-xs text-slate-700 leading-6">
+                                    <input type="checkbox" checked={img.identityVerified === true}
+                                      onChange={e => handleUpdateGalleryImage(img.id, g => ({...g,identityVerified:e.target.checked}))}
+                                      className="mt-1 accent-orange-600" />
+                                    تعلق این عکس به کد {img.variantCode} را با مشخصات و اندازهٔ قطعه بررسی و تأیید کرده‌ام.
+                                  </label>
+                                )}
                                 <div>
                                   <input
                                     type="text"

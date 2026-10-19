@@ -36,6 +36,8 @@ export interface ProductGalleryImage {
   url: string;
   fileName?: string;
   scope: 'family' | 'variant';
+  /** Admin has checked this exact image against its assigned inventory SKU. */
+  identityVerified?: boolean;
   variantCode?: string;
   title?: string;
   order?: number;

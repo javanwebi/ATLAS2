@@ -1724,8 +1724,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                       <div>
                         <div className="font-black text-sm sm:text-base flex items-center gap-2">
                           <span>
-                            🎯 انطباق قطعی: قطعهٔ تصویر مشتری در کاتالوگ اطلس
-                            پیدا شد
+                            کد منطبق بر اساس شواهد در کاتالوگ پیدا شد
                           </span>
                         </div>
                         <p className="text-xs text-emerald-50 leading-relaxed mt-0.5">
@@ -1741,8 +1740,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                               (item) => item.visualVerdict === "exact_match",
                             )?.code
                           }
-                          ) — تصویر و فرم ظاهری با این محصول در انبار ۳۰,۰۰۰
-                          قلمی صنعت پیش مطابقت دارد.
+                          ) — پیش از سفارش، ابعاد، جنس و شرایط کارکرد را کنترل کنید.
                         </p>
                       </div>
                     </div>
@@ -1760,9 +1758,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
 
                   const exactMatches = combinedList.filter(
                     (item) =>
-                      item.visualVerdict === "exact_match" ||
-                      (item.visualDistance !== undefined &&
-                        item.visualDistance <= 0.05),
+                      item.visualVerdict === "exact_match",
                   );
 
                   // Show all matched and closest similar products found in the catalog
@@ -1776,13 +1772,13 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                             <Layers className="w-4 h-4 text-[#E06518]" />
                             <span>
                               {exactMatches.length > 0
-                                ? `محصول دقیق و عین تصویر مشتری در کاتالوگ (${toPersianDigits(allDisplayProducts.length)} محصول)`
+                                ? `کالای منطبق و گزینه‌های مشابه در کاتالوگ (${toPersianDigits(allDisplayProducts.length)} محصول)`
                                 : `محصولات با بیشترین تشابه شکل و شمایل به تصویر مشتری (${toPersianDigits(allDisplayProducts.length)} محصول)`}
                             </span>
                           </h4>
                           <span className="text-xs text-slate-500">
                             {exactMatches.length > 0
-                              ? "تطبیق قطعی بر اساس فرم هندسی، شیارها و ظاهر فیزیکی قطعهٔ مشتری"
+                              ? "کد منطبق بر اساس شواهد ثبت‌شده؛ ابعاد و شرایط کارکرد را پیش از سفارش کنترل کنید"
                               : "تطبیق تصویری هوشمند بر اساس بیشترین تشابه شکل، هندسه، دندانه‌ها و ساختار ظاهری"}
                           </span>
                         </div>
@@ -1793,9 +1789,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                               match) as any;
                             const priceInfo = getItemPrice(catalogItem);
                             const isExact =
-                              match.visualVerdict === "exact_match" ||
-                              (match.visualDistance !== undefined &&
-                                match.visualDistance <= 0.05);
+                              match.visualVerdict === "exact_match";
 
                             return (
                               <div
@@ -1834,7 +1828,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                                             از ۱۰۰
                                           </span>
                                         </span>
-                                        {match.matchType === "code" && (
+                                        {match.matchType === "code" && isExact && (
                                           <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[10px] font-bold">
                                             کد خوانده‌شده منطبق است
                                           </span>
@@ -1853,7 +1847,7 @@ export const AiVisualPartSearchModal: React.FC<Props> = ({
                                           )}
                                           <span>
                                             {isExact
-                                              ? "انطباق قطعی تصویری (عین محصول)"
+                                              ? "کد منطبق بر اساس شواهد"
                                               : "محصول مشابه در کاتالوگ اطلس"}
                                           </span>
                                         </span>
