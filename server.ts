@@ -1,3 +1,9 @@
+import {checkoutApi} from './server/db/checkout';
+import {runtimeApi} from './server/db/runtimeApi';
+import {databaseEnabled,database} from './server/db/connection';
+import {readProducts,readDocument,writeDocument,saveProducts} from './server/db/repository';
+import {transaction} from './server/db/connection';
+import {installDatabaseProducts,normalizeMergedProduct} from './src/data/mockGenerator';
 import {partFamilyCompatible} from './src/utils/partFamilyCompatibility';
 import {partDimensionMatch} from './src/utils/partDimensionMatch';
 import {partMeasurements,measurementError,measurementText,persianPartAnalysis} from './src/utils/partMeasurements';
@@ -294,6 +300,8 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
+app.post('/api/checkout',checkoutApi);
+app.get('/api/runtime',runtimeApi);app.post('/api/runtime',runtimeApi);
 app.all('/api/portal', (req, res) => { void portalHandler(req, res); });
 app.use('/api/catalog', (req, res, next) => {
   if (req.method === 'GET' || req.method === 'HEAD') return next();
@@ -418,6 +426,7 @@ let CATALOG_OVERRIDES_CACHE: CatalogOverridesDb | null = null;
 
 function loadCatalogOverridesDb(): CatalogOverridesDb {
   if (CATALOG_OVERRIDES_CACHE) return CATALOG_OVERRIDES_CACHE;
+  if(databaseEnabled())throw new Error("Database catalogue has not been initialized; local fallback is disabled");
   try {
     if (fs.existsSync(CATALOG_OVERRIDES_DB_PATH)) {
       const raw = fs.readFileSync(CATALOG_OVERRIDES_DB_PATH, 'utf-8');
@@ -442,7 +451,17 @@ function loadCatalogOverridesDb(): CatalogOverridesDb {
   return CATALOG_OVERRIDES_CACHE;
 }
 
-function saveCatalogOverridesDb(db: CatalogOverridesDb): void {
+async function saveCatalogOverridesDb(db: CatalogOverridesDb): Promise<void> {
+  if(databaseEnabled()){
+    db.updatedAt=new Date().toISOString();
+    await transaction(async client=>{await writeDocument(client,"catalog_overrides/runtime",db,"global",undefined,"catalog_overrides");const previous:CatalogOverridesDb=CATALOG_OVERRIDES_CACHE || {version:1,updatedAt:"",families:{},deletedCodes:[]};
+      const codes=new Set([...Object.keys(db.families),...Object.keys(previous.families)]);
+      const baseline=await readDocument(client,'catalogue/base','global','reference');if(!baseline)throw new Error('Missing database catalogue baseline');
+      const products=[];for(const code of codes){if(JSON.stringify(db.families[code])===JSON.stringify(previous.families[code]))continue;const base=baseline.find((p:any)=>p.code===code);if(db.families[code] || base)products.push(normalizeMergedProduct(base || null,db.families[code] || {}));}
+      await saveProducts(client,products);
+      if(db.deletedCodes.length)await client.query('update public.product_families set active=false where code=any($1::text[])',[db.deletedCodes]);});
+    CATALOG_OVERRIDES_CACHE=db;return;
+  }
   db.updatedAt = new Date().toISOString();
   CATALOG_OVERRIDES_CACHE = db;
   try {
@@ -460,12 +479,13 @@ app.get('/api/catalog/overrides', async (req, res) => {
   }catch {return res.status(503).json({success:false,message:'دریافت کاتالوگ ممکن نشد.'});}
 });
 
-app.post('/api/catalog/overrides/family', (req, res) => {
+app.post('/api/catalog/overrides/family', async (req, res) => {
+  try {
   const family = req.body?.family;
   if (!family || !family.code) {
     return res.status(400).json({ status: 'error', message: 'کد خانواده محصول الزامی است.' });
   }
-  const db = loadCatalogOverridesDb();
+  const db = structuredClone(loadCatalogOverridesDb());
   const code = String(family.code).trim();
   db.families[code] = {
     ...family,
@@ -473,11 +493,13 @@ app.post('/api/catalog/overrides/family', (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   db.deletedCodes = db.deletedCodes.filter((c) => c !== code);
-  saveCatalogOverridesDb(db);
+  await saveCatalogOverridesDb(db);
   return res.json({ status: 'ok', success: true, family: db.families[code], data: db });
+  }catch {return res.status(503).json({success:false,message:'ذخیره در پایگاه داده انجام نشد؛ دوباره تلاش کنید.'});}
 });
 
-app.delete('/api/catalog/overrides/family/:code', (req, res) => {
+app.delete('/api/catalog/overrides/family/:code', async (req, res) => {
+  try {
   const code = decodeURIComponent(req.params.code || '').trim();
   if (!code) {
     return res.status(400).json({ status: 'error', message: 'کد خانواده نامعتبر است.' });
@@ -487,11 +509,13 @@ app.delete('/api/catalog/overrides/family/:code', (req, res) => {
   if (!db.deletedCodes.includes(code)) {
     db.deletedCodes.push(code);
   }
-  saveCatalogOverridesDb(db);
+  await saveCatalogOverridesDb(db);
   return res.json({ status: 'ok', success: true, data: db });
+  }catch {return res.status(503).json({success:false,message:'ذخیره در پایگاه داده انجام نشد؛ دوباره تلاش کنید.'});}
 });
 
-app.post('/api/catalog/overrides/reset-family/:code', (req, res) => {
+app.post('/api/catalog/overrides/reset-family/:code', async (req, res) => {
+  try {
   const code = decodeURIComponent(req.params.code || '').trim();
   if (!code) {
     return res.status(400).json({ status: 'error', message: 'کد خانواده نامعتبر است.' });
@@ -499,24 +523,27 @@ app.post('/api/catalog/overrides/reset-family/:code', (req, res) => {
   const db = loadCatalogOverridesDb();
   delete db.families[code];
   db.deletedCodes = db.deletedCodes.filter((c) => c !== code);
-  saveCatalogOverridesDb(db);
+  await saveCatalogOverridesDb(db);
   return res.json({ status: 'ok', success: true, data: db });
+  }catch {return res.status(503).json({success:false,message:'ذخیره در پایگاه داده انجام نشد؛ دوباره تلاش کنید.'});}
 });
 
-app.post('/api/catalog/overrides/bulk', (req, res) => {
+app.post('/api/catalog/overrides/bulk', async (req, res) => {
+  try {
   const incoming = req.body?.data;
   if (!incoming || typeof incoming !== 'object') {
     return res.status(400).json({ status: 'error', message: 'ساختار داده نامعتبر است.' });
   }
-  const db = loadCatalogOverridesDb();
+  const db = structuredClone(loadCatalogOverridesDb());
   if (incoming.families && typeof incoming.families === 'object') {
     db.families = { ...db.families, ...incoming.families };
   }
   if (Array.isArray(incoming.deletedCodes)) {
     db.deletedCodes = incoming.deletedCodes;
   }
-  saveCatalogOverridesDb(db);
+  await saveCatalogOverridesDb(db);
   return res.json({ status: 'ok', success: true, data: db });
+  }catch {return res.status(503).json({success:false,message:'ذخیره در پایگاه داده انجام نشد؛ دوباره تلاش کنید.'});}
 });
 
 // Authentication is handled exclusively by the signed-session /api/portal endpoint.
@@ -6427,6 +6454,15 @@ function setupGeminiLiveWebSocket(server: http.Server) {
 
 // Vite middleware setup
 async function start() {
+  if(databaseEnabled()){
+    await database().query('select revision from app_private.portal_version');
+    const products=await readProducts();if(!products.length)throw new Error('Database catalogue is empty; run the reviewed importer first');
+    installDatabaseProducts(products);
+    const saved=await readDocument(database(),'catalog_overrides/runtime','global','catalog_overrides');
+    CATALOG_OVERRIDES_CACHE=saved || {version:1,updatedAt:'',deletedCodes:[],families:{}};
+    inventoryCodes.clear();for(const product of products)for(const variant of product.variants || [])inventoryCodes.add(variant.code);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -6454,7 +6490,7 @@ async function start() {
   });
 }
 
-start();
+start().catch(error=>{console.error("[Startup failed]",error?.name || "DatabaseError");process.exitCode=1;});
 
 setTimeout(()=>{
  const origin=String(process.env.VISION_IMAGE_PUBLIC_ORIGIN || process.env.APP_URL || '').replace(/\/$/,'');

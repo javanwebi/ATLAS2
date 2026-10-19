@@ -1,3 +1,4 @@
+import {databaseStorageEnabled} from '../services/durableStorage';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart, SHIPPING_METHODS, ShippingMethod } from '../context/CartContext';
@@ -96,35 +97,35 @@ export const CheckoutPage: React.FC = () => {
     setNewPostalCode('');
   };
 
-  const handleFinalOrderSubmit = () => {
+  const handleFinalOrderSubmit = async () => {
     if (!activeAddress) return;
 
-    if (paymentMethod === 'online') {
+    if (paymentMethod === 'online' && !databaseStorageEnabled()) {
       // Open mock bank gateway
       setShowBankGatewayModal(true);
       return;
     }
 
     // Direct place order for transfer or credit
-    const order = placeOrder({
+    try { const order = await placeOrder({
       address: activeAddress,
       shippingMethod: selectedShipping,
       paymentMethod,
       receiptImage: receiptUploaded ? 'uploaded_receipt_slip.png' : undefined,
     });
-    setCompletedOrder(order);
+    setCompletedOrder(order); } catch(error:any){window.alert(error.message);}
   };
 
-  const handleBankSuccess = () => {
+  const handleBankSuccess = async () => {
     setShowBankGatewayModal(false);
     if (!activeAddress) return;
 
-    const order = placeOrder({
+    try { const order = await placeOrder({
       address: activeAddress,
       shippingMethod: selectedShipping,
       paymentMethod: 'online',
     });
-    setCompletedOrder(order);
+    setCompletedOrder(order); } catch(error:any){window.alert(error.message);}
   };
 
   const copyToClipboard = (text: string) => {
@@ -145,7 +146,7 @@ export const CheckoutPage: React.FC = () => {
           <div className="space-y-1">
             <h1 className="text-2xl font-black text-[#55565A]">سفارش شما با موفقیت ثبت گردید</h1>
             <p className="text-xs text-[#777A7D]">
-              پیامک تأیید ثبت سفارش و صدور پیش‌فاکتور به شماره <span className="font-mono font-bold text-[#55565A]">{completedOrder.recipientPhone || currentUser?.phone}</span> ارسال شد.
+              {databaseStorageEnabled() ? 'درخواست سفارش ثبت شد؛ تأیید مبلغ نهایی و پرداخت از طرف کارشناسان انجام می‌شود.' : <>پیامک تأیید ثبت سفارش و صدور پیش‌فاکتور به شماره <span className="font-mono font-bold text-[#55565A]">{completedOrder.recipientPhone || currentUser?.phone}</span> ارسال شد.</>}
             </p>
           </div>
 
@@ -172,7 +173,7 @@ export const CheckoutPage: React.FC = () => {
               <span className="text-[#777A7D]">روش پرداخت:</span>
               <span className="font-bold text-[#55565A]">
                 {completedOrder.paymentMethod === 'online'
-                  ? 'پرداخت اینترنتی شتاب (تأییدشده)'
+                  ? (completedOrder.paymentStatus==='paid'?'پرداخت اینترنتی شتاب (تأییدشده)':'در انتظار پرداخت')
                   : completedOrder.paymentMethod === 'transfer'
                   ? 'کارت‌به‌کارت / فیش واریز'
                   : 'خرید اعتباری B2B'}

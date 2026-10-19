@@ -1,3 +1,7 @@
+import {database as postgresDatabase} from '../server/db/connection';
+import {supabaseIdentity,supabaseAuthAction,refreshAuth} from "../server/db/supabaseAuth";
+import {databaseEnabled} from "../server/db/connection";
+import {readPortal,writePortal} from "../server/db/repository";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -70,6 +74,7 @@ async function redis(command: unknown[]) {
   return data.result;
 }
 async function readDb(): Promise<Database> {
+  if(databaseEnabled())return readPortal();
   if (redisUrl() && redisToken()) {
     const raw = await redis(["GET", redisKey()]);
     return raw ? JSON.parse(raw) : empty();
@@ -84,6 +89,7 @@ async function readDb(): Promise<Database> {
   }
 }
 async function writeDb(db: Database, expected: number) {
+  if(databaseEnabled())return writePortal(db,expected);
   db.revision = expected + 1;
   if (redisUrl() && redisToken()) {
     const script =
@@ -115,7 +121,7 @@ let localSecret: Promise<string> | undefined;
 async function secret() {
   if ((process.env.PORTAL_SESSION_SECRET || "").length >= 32)
     return process.env.PORTAL_SESSION_SECRET!;
-  if (process.env.VERCEL || process.env.NODE_ENV === "production")
+  if (databaseEnabled() || process.env.VERCEL || process.env.NODE_ENV === "production")
     fail(503, "تنظیمات ورود امن پنل کامل نشده است.");
   localSecret ??= (async () => {
     const file = `${dbPath()}.secret`;
@@ -193,6 +199,7 @@ async function session(
   req: IncomingMessage,
   db: Database,
 ): Promise<{ admin: boolean; user?: Row }> {
+  if(databaseEnabled())return supabaseIdentity(req,db);
   const cookie = (req.headers.cookie || "")
     .split(";")
     .map((s) => s.trim())
@@ -355,7 +362,10 @@ async function rateLimit(req: IncomingMessage) {
     ? req.headers["x-forwarded-for"]
     : req.socket.remoteAddress;
   const key = `${redisKey()}:login:${crypto.createHash("sha256").update(String(ip)).digest("hex")}`;
-  if (redisUrl() && redisToken()) {
+  if(databaseEnabled()){
+    const count=Number((await postgresDatabase().query(`insert into app_private.rate_limits(bucket,attempts,expires_at) values($1,1,now()+interval '15 minutes') on conflict(bucket) do update set attempts=case when rate_limits.expires_at<now() then 1 else rate_limits.attempts+1 end,expires_at=case when rate_limits.expires_at<now() then now()+interval '15 minutes' else rate_limits.expires_at end returning attempts`,[key])).rows[0].attempts);
+    if(count>25)fail(429,'تعداد تلاش‌های ورود بیش از حد مجاز است.');
+  } else if (redisUrl() && redisToken()) {
     const count = await redis(["INCR", key]);
     if (count === 1) await redis(["EXPIRE", key, 900]);
     if (count > 25)
@@ -405,12 +415,13 @@ export default async function handler(
   try {
     if (req.method !== "GET" && req.method !== "POST")
       return send(405, { success: false });
+    if(databaseEnabled() && req.method==="GET")await refreshAuth(req,res);
     const db = await readDb();
     const auth = await session(req, db);
     if (req.method === "GET")
       return send(200, {
         success: true,
-        smsAvailable: smsConfigured(),
+        smsAvailable: databaseEnabled() ? true : smsConfigured(),
         revision: db.revision,
         user: auth.user ? safeUser(auth.user) : null,
         admin: auth.admin,
@@ -422,6 +433,7 @@ export default async function handler(
       });
     csrf(req);
     const body = await readBody(req);
+    if(databaseEnabled() && ["register","login","admin_login","otp_request","otp_verify","logout"].includes(body.action)){await rateLimit(req);if(await supabaseAuthAction(req,res,body,safeUser))return;}
     const revision = db.revision;
     if (body.action === "logout") {
       res.setHeader(

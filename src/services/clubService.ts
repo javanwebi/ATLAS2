@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 // src/services/clubService.ts
 /**
  * Customer Club & Loyalty Service (سرویس باشگاه مشتریان صنعت پیش - بازرگانی اطلس)
@@ -313,10 +314,10 @@ class ClubService {
   public recordCategoryView(categorySlug: string): void {
     if (typeof window === 'undefined' || !categorySlug) return;
     try {
-      const raw = localStorage.getItem(this.viewedCategoriesKey);
+      const raw = durableStorage.getItem(this.viewedCategoriesKey);
       const list: string[] = raw ? JSON.parse(raw) : [];
       const updated = [categorySlug, ...list.filter(s => s !== categorySlug)].slice(0, 5);
-      localStorage.setItem(this.viewedCategoriesKey, JSON.stringify(updated));
+      durableStorage.setItem(this.viewedCategoriesKey, JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -328,7 +329,7 @@ class ClubService {
   public getRecentCategoryViews(): string[] {
     if (typeof window === 'undefined') return ['industrial-belts', 'ceramic-tiles'];
     try {
-      const raw = localStorage.getItem(this.viewedCategoriesKey);
+      const raw = durableStorage.getItem(this.viewedCategoriesKey);
       const list: string[] = raw ? JSON.parse(raw) : [];
       return list.length > 0 ? list : ['industrial-belts', 'ceramic-tiles'];
     } catch {
@@ -372,7 +373,7 @@ class ClubService {
     // Or check if user has COMEBACK mock toggle in localStorage
     let forceInactive = false;
     try {
-      if (typeof window !== 'undefined' && localStorage.getItem('hyper_sanat_mock_inactive') === 'true') {
+      if (typeof window !== 'undefined' && durableStorage.getItem('hyper_sanat_mock_inactive') === 'true') {
         forceInactive = true;
       }
     } catch {
@@ -412,9 +413,9 @@ class ClubService {
     if (typeof window === 'undefined') return;
     try {
       if (enabled) {
-        localStorage.setItem('hyper_sanat_mock_inactive', 'true');
+        durableStorage.setItem('hyper_sanat_mock_inactive', 'true');
       } else {
-        localStorage.removeItem('hyper_sanat_mock_inactive');
+        durableStorage.removeItem('hyper_sanat_mock_inactive');
       }
     } catch {
       // ignore

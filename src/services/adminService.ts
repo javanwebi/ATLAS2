@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 import { portalRequest, hydratePortal, clearPortalCache } from './portalRepository';
 import { persistPortalCache } from './portalRepository';
 import { Product, Order, PriceInquiry, Customer, DiscountCode, SmsLog, AgencyApplication, Category, Brand, Ticket, Representative, OfficialInvoice } from '../types';
@@ -311,7 +312,7 @@ const INITIAL_PRICE_HISTORY: PriceHistoryRecord[] = [
   },
 ];
 
-const INITIAL_BANNERS: BannerItem[] = [
+export const INITIAL_BANNERS: BannerItem[] = [
   {
     id: 'ban-1',
     title: 'تخفیف شگفت‌انگیز تسمه‌های صنعتی SWR و FORZA',
@@ -341,7 +342,7 @@ const INITIAL_BANNERS: BannerItem[] = [
   },
 ];
 
-const INITIAL_SMS_TEMPLATES: SmsTemplate[] = [
+export const INITIAL_SMS_TEMPLATES: SmsTemplate[] = [
   {
     id: 'tpl-1',
     eventKey: 'register',
@@ -372,7 +373,7 @@ const INITIAL_SMS_TEMPLATES: SmsTemplate[] = [
   },
 ];
 
-const INITIAL_CLUB_CONFIG: ClubConfig = {
+export const INITIAL_CLUB_CONFIG: ClubConfig = {
   pointsPer100kTomans: 1,
   tomanPerPointRedeem: 5000,
   bronzeThreshold: 0,
@@ -385,7 +386,7 @@ export const adminService = {
   // --- Admin Auth ---
   getCurrentAdmin(): AdminUser | null {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
+      const stored = durableStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -401,13 +402,13 @@ export const adminService = {
     await portalRequest({ action: 'admin_login', username, password: pass });
     await hydratePortal();
     const user: AdminUser = { id: 'admin', username, name: 'مدیریت صنعت پیش', role: 'super_admin', email: '', lastLogin: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, JSON.stringify(user));
+    durableStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, JSON.stringify(user));
     return user;
   },
   logout(): void {
     void portalRequest({ action: 'logout' });
     clearPortalCache();
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
+    durableStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
   },
   switchAdminRole(_role: AdminUser['role']): AdminUser {
     return this.getCurrentAdmin()!;
@@ -416,7 +417,7 @@ export const adminService = {
   // --- Audit Logs ---
   getAuditLogs(): AuditLog[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -556,7 +557,7 @@ export const adminService = {
   // --- Price History Logs ---
   getPriceHistory(): PriceHistoryRecord[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.PRICE_LOGS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.PRICE_LOGS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -764,7 +765,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Inquiries Management ---
   getInquiries(): PriceInquiry[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.INQUIRIES);
+      const stored = durableStorage.getItem(STORAGE_KEYS.INQUIRIES);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -806,7 +807,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Orders Management ---
   getOrders(): any[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.ORDERS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.ORDERS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -863,7 +864,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Customers & CRM ---
   getCustomers(): Customer[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.CUSTOMERS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -896,7 +897,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- CMS Banners & Sliders ---
   getBanners(): BannerItem[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.BANNERS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.BANNERS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -933,7 +934,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Club Rules Config ---
   getClubConfig(): ClubConfig {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CLUB_CONFIG);
+      const stored = durableStorage.getItem(STORAGE_KEYS.CLUB_CONFIG);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -953,7 +954,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- SMS Templates & Logs ---
   getSmsTemplates(): SmsTemplate[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SMS_TEMPLATES);
+      const stored = durableStorage.getItem(STORAGE_KEYS.SMS_TEMPLATES);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -997,7 +998,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Discounts Management ---
   getDiscounts(): DiscountCode[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.DISCOUNTS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.DISCOUNTS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1034,7 +1035,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Categories CRUD ---
   getCategories(): Category[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+      const stored = durableStorage.getItem(STORAGE_KEYS.CATEGORIES);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -1085,7 +1086,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Brands CRUD ---
   getBrands(): Brand[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.BRANDS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.BRANDS);
       if (stored) {
         const parsed: Brand[] = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -1156,7 +1157,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Active Dealers Management ---
   getActiveDealers(): (Representative & { creditLimit: number; seasonalTargetAchieved: number })[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.DEALERS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.DEALERS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1189,7 +1190,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Support Tickets Inbox ---
   getTickets(): any[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.TICKETS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.TICKETS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1235,7 +1236,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Blog & Static Pages ---
   getArticles(): BlogPost[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.BLOG);
+      const stored = durableStorage.getItem(STORAGE_KEYS.BLOG);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1310,7 +1311,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
 
   getStaticPages(): StaticPage[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.PAGES);
+      const stored = durableStorage.getItem(STORAGE_KEYS.PAGES);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1365,7 +1366,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- Campaigns Management ---
   getCampaigns(): CampaignItem[] {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CAMPAIGNS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.CAMPAIGNS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1433,7 +1434,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   // --- General System Settings ---
   getSettings(): SystemSettings {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      const stored = durableStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1487,7 +1488,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
 
   getOfficialInvoices(): OfficialInvoice[] {
     try {
-      const stored = localStorage.getItem('atlas_admin_official_invoices_v1');
+      const stored = durableStorage.getItem('atlas_admin_official_invoices_v1');
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1578,7 +1579,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
 
   getSmsLogs(): SmsLog[] {
     try {
-      const stored = localStorage.getItem('atlas_admin_sms_logs_v1');
+      const stored = durableStorage.getItem('atlas_admin_sms_logs_v1');
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1673,7 +1674,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
       customers[idx] = updatedCust;
       try {
         persistPortalCache(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
-        const storedStr = localStorage.getItem('hyper_sanat_registered_users_v2');
+        const storedStr = durableStorage.getItem('hyper_sanat_registered_users_v2');
         const registered: Customer[] = storedStr ? JSON.parse(storedStr) : [];
         const rIdx = registered.findIndex(r => r.id === customerId || r.phone === updatedCust.phone);
         if (rIdx >= 0) {
@@ -1683,7 +1684,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
         }
         persistPortalCache('hyper_sanat_registered_users_v2', JSON.stringify(registered));
 
-        const legRaw = localStorage.getItem('atlas_legacy_customers_v1');
+        const legRaw = durableStorage.getItem('atlas_legacy_customers_v1');
         const legacyList: Customer[] = legRaw ? JSON.parse(legRaw) : [];
         const lIdx = legacyList.findIndex(l => l.id === customerId || l.phone === updatedCust.phone);
         if (lIdx >= 0) {
@@ -1763,12 +1764,12 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
     try {
       persistPortalCache(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
 
-      const storedStr = localStorage.getItem('hyper_sanat_registered_users_v2');
+      const storedStr = durableStorage.getItem('hyper_sanat_registered_users_v2');
       const registered: Customer[] = storedStr ? JSON.parse(storedStr) : [];
       registered.unshift(newCust);
       persistPortalCache('hyper_sanat_registered_users_v2', JSON.stringify(registered));
 
-      const legRaw = localStorage.getItem('atlas_legacy_customers_v1');
+      const legRaw = durableStorage.getItem('atlas_legacy_customers_v1');
       const legacyList: Customer[] = legRaw ? JSON.parse(legRaw) : [];
       legacyList.unshift(newCust);
       persistPortalCache('atlas_legacy_customers_v1', JSON.stringify(legacyList));
@@ -1797,7 +1798,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
       try {
         persistPortalCache(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
 
-        const storedStr = localStorage.getItem('hyper_sanat_registered_users_v2');
+        const storedStr = durableStorage.getItem('hyper_sanat_registered_users_v2');
         const registered: Customer[] = storedStr ? JSON.parse(storedStr) : [];
         const rIdx = registered.findIndex((r: Customer) => r.id === customerId || r.phone === customers[idx].phone);
         if (rIdx >= 0) {
@@ -1814,7 +1815,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
 
   getActiveAgencies(): ActiveAgency[] {
     try {
-      const stored = localStorage.getItem('atlas_admin_active_agencies_v1');
+      const stored = durableStorage.getItem('atlas_admin_active_agencies_v1');
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1867,7 +1868,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
 
   getSupplyRequests(): SupplyRequestItem[] {
     try {
-      const stored = localStorage.getItem('atlas_admin_supply_reqs_v1');
+      const stored = durableStorage.getItem('atlas_admin_supply_reqs_v1');
       if (stored) return JSON.parse(stored);
     } catch {
       // ignore
@@ -1930,7 +1931,7 @@ ERR-001,تسمه بدون قیمت تستی,نامشخص,ناشناخته,0,-5`;
   resetToInitial(): void {
     Object.values(STORAGE_KEYS).forEach(k => {
       try {
-        localStorage.removeItem(k);
+        durableStorage.removeItem(k);
       } catch {
         // ignore
       }

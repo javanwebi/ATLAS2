@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import { enrichProductTechnicalData } from './productTechnicalData';
 import { groupProductFamilies } from './productFamilies';
 import { publicCatalog } from "../utils/catalogPrivacy";
@@ -27,6 +28,9 @@ export interface CatalogOverridesState {
   families: Record<string, Partial<Product> & { code: string }>;
 }
 
+let databaseProducts:Product[]|null=null;
+export function installDatabaseProducts(products:Product[]){databaseProducts=products;invalidateCatalogCache();}
+const baselineProducts=()=>databaseProducts || USER_PRODUCTS_RAW;
 let sessionOverrides: CatalogOverridesState | null = null;
 let catalogRequestVersion = 0;
 let cachedProducts: Product[] | null = null;
@@ -56,7 +60,7 @@ export function subscribeCatalogChanges(listener: () => void): () => void {
 export function getOverridesState(): CatalogOverridesState {
   if (typeof window !== "undefined" && sessionOverrides)
     return sessionOverrides;
-  const seed = initialOverridesDb as unknown as CatalogOverridesState;
+  const seed:CatalogOverridesState=databaseProducts ? {version:1,updatedAt:"",deletedCodes:[],families:{}} : initialOverridesDb as unknown as CatalogOverridesState;
   if (typeof window === "undefined") {
     return {
       version: seed.version || 1,
@@ -67,7 +71,7 @@ export function getOverridesState(): CatalogOverridesState {
   }
 
   try {
-    const raw = window.localStorage.getItem(OVERRIDES_STORAGE_KEY);
+    const raw = durableStorage.getItem(OVERRIDES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as CatalogOverridesState;
       return {
@@ -98,7 +102,7 @@ function saveOverridesStateToStorage(state: CatalogOverridesState) {
   if (typeof window === "undefined") return;
   sessionOverrides = state;
   try {
-    window.localStorage.setItem(
+    durableStorage.setItem(
       OVERRIDES_STORAGE_KEY,
       JSON.stringify(publicCatalog(state)),
     );
@@ -138,7 +142,7 @@ export async function syncCatalogFromServer(): Promise<void> {
           ]),
         ),
         families: {
-          ...(initialOverridesDb as unknown as CatalogOverridesState).families,
+          ...(databaseProducts ? {} : (initialOverridesDb as unknown as CatalogOverridesState).families),
           ...(json.data.families || {}),
         },
       };
@@ -154,7 +158,7 @@ if (typeof window !== "undefined")
   window.addEventListener("atlas-session-updated", () => {
     sessionOverrides = null;
     catalogRequestVersion++;
-    window.localStorage.removeItem(OVERRIDES_STORAGE_KEY);
+    durableStorage.removeItem(OVERRIDES_STORAGE_KEY);
     invalidateCatalogCache();
     void syncCatalogFromServer();
   });
@@ -190,7 +194,7 @@ export function buildDefaultGalleryImages(
   return gallery;
 }
 
-function normalizeMergedProduct(
+export function normalizeMergedProduct(
   base: Product | null,
   override?: Partial<Product> & { code: string },
 ): Product {
@@ -338,7 +342,7 @@ function ensureBrowserCatalogBuilt() {
   // 1. Add custom families created in Admin that are not in USER_PRODUCTS
   for (const [code, override] of Object.entries(overrides.families || {})) {
     if (deletedSet.has(code.toLowerCase())) continue;
-    const existsInBase = USER_PRODUCTS_RAW.some(
+    const existsInBase = baselineProducts().some(
       (p) => p.code.toLowerCase() === code.toLowerCase(),
     );
     if (!existsInBase) {
@@ -348,7 +352,7 @@ function ensureBrowserCatalogBuilt() {
   }
 
   // 2. Merge all 1,383 baseline families with any overrides
-  for (const base of USER_PRODUCTS_RAW) {
+  for (const base of baselineProducts()) {
     const canonicalCode = PRODUCT_FAMILY_ALIASES.get(base.code.toLowerCase()) || base.code;
     if (deletedSet.has(base.code.toLowerCase()) || deletedSet.has(canonicalCode.toLowerCase())) continue;
     // A saved grouped family already contains its complete SKU list. Do not re-add
@@ -400,7 +404,7 @@ function ensureBrowserCatalogBuilt() {
 export function generateMockProducts(): Product[] {
   if (typeof window === "undefined") {
     if (cachedProducts) return cachedProducts;
-    cachedProducts = [...USER_PRODUCTS];
+    cachedProducts = [...(databaseProducts || USER_PRODUCTS)];
     cachedMap = new Map();
     for (const p of cachedProducts) {
       p.variants?.forEach((v) => cachedMap!.set(v.code.toLowerCase(), p));
