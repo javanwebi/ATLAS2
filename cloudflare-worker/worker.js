@@ -432,20 +432,20 @@ async function resolveComparisonImage(value) {
 async function handleMultimodalComparison(body, env, cors) {
   const apiKey=env?.GEMINI_API_KEY || SOURCE_AI_API_KEY;
   if(!apiKey)return errorResponse('ai_not_configured','کلید هوش مصنوعی ورکر تنظیم نشده است.',503,cors);
-  const contents=[];let imageCount=0;
-  for(const message of (Array.isArray(body.messages) ? body.messages : []).slice(-8)) {
-    const parts=[];
-    for(const part of (Array.isArray(message.content) ? message.content : [])) {
-      if(part.type==='text' && typeof part.text==='string')parts.push({text:part.text.slice(0,20000)});
-      if(part.type==='image_url') {
-        let image;
-        try{image=await resolveComparisonImage(part.image_url?.url);}catch{return errorResponse('invalid_image','لینک تصویر در دسترس نیست یا فایل تصویر معتبر نیست.',400,cors);}
-        imageCount++;parts.push({inlineData:image});
-      }
-    }
-    if(parts.length)contents.push({role:message.role==='assistant' ? 'model' : 'user',parts});
-  }
+  const messages=(Array.isArray(body.messages) ? body.messages : []).slice(-8);
+  const imageCount=messages.reduce((count,message)=>count+(Array.isArray(message.content) ? message.content : []).filter(part=>part.type==='image_url').length,0);
   if(imageCount<1 || imageCount>10)return errorResponse('invalid_image_count','تعداد تصاویر درخواست معتبر نیست.',400,cors);
+  let contents;
+  try {
+    contents=(await Promise.all(messages.map(async message=>{
+      const parts=(await Promise.all((Array.isArray(message.content) ? message.content : []).map(async part=>{
+        if(part.type==='text' && typeof part.text==='string')return {text:part.text.slice(0,20000)};
+        if(part.type==='image_url')return {inlineData:await resolveComparisonImage(part.image_url?.url)};
+        return null;
+      }))).filter(Boolean);
+      return parts.length ? {role:message.role==='assistant' ? 'model' : 'user',parts} : null;
+    }))).filter(Boolean);
+  }catch{return errorResponse('invalid_image','لینک تصویر در دسترس نیست یا فایل تصویر معتبر نیست.',400,cors);}
   const models=[...new Set([env?.GEMINI_VISION_MODEL,body.model,'gemini-flash-latest',...GEMINI_CASCADE_MODELS].filter(Boolean))];
   for(const model of models) {
     try {

@@ -1,3 +1,4 @@
+import {photoFingerprint,sameCatalogPhotograph,type PhotoFingerprint} from './catalogPhotoIdentity';
 import {picksSchema,comparisonsSchema} from './recognitionSchemas';
 import sharp, {type OverlayOptions} from 'sharp';
 import { createHash } from 'node:crypto';
@@ -7,7 +8,7 @@ export interface ScanProgress {stage:'preparing'|'scanning'|'verifying'|'complet
 export interface CatalogPhotoMatch {imageId:string;image:string;label:string;score:number;reason:string;relation?:'very_similar'|'related';familyNames?:string[];bindings:CatalogImageRecord['bindings'];}
 export interface ScanCoverage {total:number;compared:number;failed:number;complete:boolean;providerAvailable:boolean;failedImageIds:string[];}
 export type VisionCall=(parts:any[],schema?:unknown)=>Promise<string>;
-type Batch={rows:CatalogImageRecord[];sheet:Buffer;missing:string[]};
+type Batch={rows:CatalogImageRecord[];sheet:Buffer;missing:string[];fingerprints:Map<string,PhotoFingerprint>};
 const prepared=new Map<string,Promise<Batch>>();
 /** A model score alone cannot establish a physical match. Missing evidence fails closed. */
 export function hasPhysicalEvidence(c:any):boolean {
@@ -40,11 +41,14 @@ function parse(text:string) {return JSON.parse(text.replace(/^\s*```(?:json)?\s*
 /** Every decodable image is shown to the model. Retrieval never trims this list. */
 export async function scanEveryCatalogImage(input:{
  query:Buffer;images:CatalogImageRecord[];readImage:(image:CatalogImageRecord)=>Promise<Buffer|null>;
- vision:VisionCall;progress?:(state:ScanProgress)=>void;batchSize?:number;concurrency?:number;observation?:unknown;customerDetails?:unknown;describeImage?:(image:CatalogImageRecord,detail?:'coarse'|'fine')=>unknown;
+ vision:VisionCall;progress?:(state:ScanProgress)=>void;batchSize?:number;concurrency?:number;observation?:unknown;customerDetails?:unknown;detectDuplicatePhotos?:boolean;describeImage?:(image:CatalogImageRecord,detail?:'coarse'|'fine')=>unknown;
 }) {
  const size=Math.max(1,Math.min(12,input.batchSize || 12));
  const user=await sharp(input.query).rotate().resize(1400,1400,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:94}).toBuffer();
  const imagePart=(data:Buffer)=>({inlineData:{mimeType:'image/jpeg',data:data.toString('base64')}});
+ const detectDuplicates=input.detectDuplicatePhotos!==false;
+ const queryFingerprint=detectDuplicates ? await photoFingerprint(input.query) : null;
+ const identical=new Map<string,CatalogPhotoMatch>();
  const matches=new Map<string,CatalogPhotoMatch>();let compared=0;const failedImageIds:string[]=[];let providerAvailable=true;
  const update=(stage:ScanProgress['stage'])=>input.progress?.({stage,total:input.images.length,compared,failed:failedImageIds.length});
  update('preparing');
@@ -52,12 +56,12 @@ export async function scanEveryCatalogImage(input:{
  await boundedWork(Math.ceil(input.images.length/size),concurrency,()=>providerAvailable,async batchIndex=>{
   const offset=batchIndex*size;
   const rows=input.images.slice(offset,offset+size);
-  const key=createHash('sha256').update(JSON.stringify(rows.map(r=>[r.id,r.url,r.revision]))).digest('hex');
+  const key=createHash('sha256').update(JSON.stringify([detectDuplicates,rows.map(r=>[r.id,r.url,r.revision])])).digest('hex');
   if(!prepared.has(key))prepared.set(key,(async()=>{
-    const loaded:(Buffer|null)[]=new Array(rows.length).fill(null);
+    const loaded:(Buffer|null)[]=new Array(rows.length).fill(null);const fingerprints=new Map<string,PhotoFingerprint>();
     let next=0;
     await Promise.all(Array.from({length:Math.min(6,rows.length)},async()=>{
-      while(next<rows.length){const i=next++;try {const buf=await input.readImage(rows[i]); if(buf)loaded[i]=await sharp(buf).rotate().resize(478,452,{fit:'contain',background:'#fff'}).jpeg({quality:92}).toBuffer();}catch{}}
+      while(next<rows.length){const i=next++;try {const buf=await input.readImage(rows[i]); if(buf && detectDuplicates)fingerprints.set(rows[i].id,await photoFingerprint(buf)); if(buf)loaded[i]=await sharp(buf).rotate().resize(478,452,{fit:'contain',background:'#fff'}).jpeg({quality:92}).toBuffer();}catch{}}
     }));
     const valid=rows.filter((_,i)=>loaded[i]);const missing=rows.filter((_,i)=>!loaded[i]).map(r=>r.id);
     const columns=3,cell=480,height=Math.max(1,Math.ceil(valid.length/columns))*cell;
@@ -68,10 +72,11 @@ export async function scanEveryCatalogImage(input:{
       composites.push({input:Buffer.from(`<svg width="480" height="26"><rect width="480" height="26" fill="white"/><text x="12" y="20" font-size="20" font-family="sans-serif" fill="black">${i+1}</text></svg>`),left,top});
     }
     const sheet=await sharp({create:{width:columns*cell,height,channels:3,background:'#fff'}}).composite(composites).jpeg({quality:94}).toBuffer();
-    return {rows:valid,sheet,missing};
+    return {rows:valid,sheet,missing,fingerprints};
   })());
   if(prepared.size>80)prepared.delete(prepared.keys().next().value!);
   const batch=await prepared.get(key)!;
+  if(queryFingerprint)for(const row of batch.rows){const fingerprint=batch.fingerprints.get(row.id);if(fingerprint && sameCatalogPhotograph(queryFingerprint,fingerprint))identical.set(row.id,{imageId:row.id,image:row.url,label:row.label,score:99,relation:'very_similar',reason:'همین عکس در کاتالوگ پیدا شد؛ یکسان بودن عکس، کد دقیق کالای انبار را تأیید نمی‌کند.',bindings:row.bindings});}
   failedImageIds.push(...batch.missing);
   if(batch.missing.length)prepared.delete(key); // retry unreadable images on the next request
   if(!batch.rows.length)return;
@@ -89,9 +94,9 @@ export async function scanEveryCatalogImage(input:{
   }
  });
  // Verify every shortlisted photo individually; batch scores are not calibrated across sheets.
- const selected=[...matches.values()];
- const verified:CatalogPhotoMatch[]=[];
- await boundedWork(Math.ceil(selected.length/3),concurrency,()=>providerAvailable,async groupIndex=>{
+ const selected=[...matches.values()].filter(row=>!identical.has(row.imageId));
+ const verified:CatalogPhotoMatch[]=[...identical.values()];
+ await boundedWork(Math.ceil(selected.length/3),concurrency,()=>true,async groupIndex=>{
   const i=groupIndex*3;
   update('verifying');const group=selected.slice(i,i+3);const loaded:CatalogPhotoMatch[]=[];const parts:any[]=[imagePart(user)];
   for(const candidate of group){const row=input.images.find(r=>r.id===candidate.imageId)!;try{const buffer=await input.readImage(row);if(buffer){const jpg=await sharp(buffer).rotate().resize(1000,1000,{fit:'inside',withoutEnlargement:true}).flatten({background:'#fff'}).jpeg({quality:95}).toBuffer();loaded.push(candidate);parts.push({text:`گزینه ${loaded.length}`},imagePart(jpg));}}catch{}}
@@ -103,7 +108,7 @@ export async function scanEveryCatalogImage(input:{
       const differences=Array.isArray(c.contradictions) ? c.contradictions.filter((v:unknown)=>typeof v==='string').join('؛ ') : '';
       const reason=(relation==='related' ? 'هم‌خانواده با تفاوت؛ جایگزین تأییدشده نیست. ' : '')+String(c.reason || loaded[n-1].reason)+(differences ? ' تفاوت‌ها: '+differences : '');
       verified.push({...loaded[n-1],relation,score:Math.min(relation==='related' ? 79 : 99,score),reason:reason.slice(0,1200)});}
-  }catch{providerAvailable=false;}
+  }catch(error){providerAvailable=false;console.warn('[Catalogue verification failed]',error instanceof SyntaxError ? 'invalid_json' : (error as any)?.code || (error as any)?.name || 'unknown');}
  });
  const coverage:ScanCoverage={total:input.images.length,compared,failed:failedImageIds.length,complete:providerAvailable && compared===input.images.length && failedImageIds.length===0,providerAvailable,failedImageIds};
  update('complete');
