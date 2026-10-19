@@ -23,9 +23,11 @@ export function catalogRecognitionContext(products:Product[],observation:any){
 }
 
 /** Model JSON may use a string where an array was requested; never pass that into catalogue scorers. */
-export function normalizeRecognitionObservation(input:any){
+export function normalizeRecognitionObservation(value:any){
+ const input=value?.recognition || value?.analysis || value?.result || value || {};
+
  const list=(value:unknown)=>Array.isArray(value) ? value.filter((entry):entry is string=>typeof entry==='string').slice(0,24) : typeof value==='string' && value.trim() ? [value] : [];
- return {...input,visual_features:list(input?.visual_features),technical_features:list(input?.technical_features),
+ return {...input,whatYouSee:input.whatYouSee || input.what_you_see || input.description || '',detected_part_type:input.detected_part_type || input.part_type || input.product_name || '',visual_features:list(input?.visual_features),technical_features:list(input?.technical_features),
   readable_markings:list(input?.readable_markings),unknown_parameters:list(input?.unknown_parameters),
   observed_specifications:Array.isArray(input?.observed_specifications) ? input.observed_specifications : []};
 }

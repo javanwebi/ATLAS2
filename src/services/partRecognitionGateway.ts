@@ -5,7 +5,7 @@ import { recognitionWorkerUrl } from '../utils/recognitionPolicy';
 /** Server-only multimodal transport; direct provider keys are never sent to a Worker. */
 export async function workerVision(contents: any[], options: {
   env?: Record<string, string | undefined>; fetch?: typeof fetch; publishImage?: ImagePublisher;
-  task?:'catalog-image-scan'|'catalog-image-embedding';
+  task?:'catalog-image-scan'|'catalog-image-embedding';responseSchema?:unknown;
 } = {}): Promise<{text:string;model:string}> {
   const env=options.env || process.env;
   const origin=recognitionWorkerUrl(env);
@@ -29,7 +29,7 @@ export async function workerVision(contents: any[], options: {
   const timeout=Number.isFinite(ms) ? Math.max(1500,Math.min(ms,90000)) : 45000;
   const response=await (options.fetch || fetch)(`${origin}/v1/chat/completions`,{
     method:'POST',headers,signal:AbortSignal.timeout(timeout),
-    body:JSON.stringify({task:options.task || 'catalog-image-scan',messages,model:env.PART_RECOGNITION_MODEL || undefined,response_format:{type:'json_object'}}),
+    body:JSON.stringify({task:options.task || 'catalog-image-scan',messages,response_schema:options.responseSchema,model:env.PART_RECOGNITION_MODEL || undefined,response_format:{type:'json_object'}}),
   });
   if(!response.ok){
     const detail=await response.json().catch(()=>null);

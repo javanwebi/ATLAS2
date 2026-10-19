@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recognitionWorkerUrl, recognitionApiKey, recognitionCatalog, finalizeRecognition } from '../src/utils/recognitionPolicy';
@@ -100,5 +101,15 @@ test('Worker authentication, missing provider key and inaccessible images have a
   await assert.rejects(()=>workerVision([],{env:{},fetch:async()=>new Response(JSON.stringify({error:{type,message:'provider-private-detail'}}),{status:Number(status)})}),error=>{
    assert.ok(error instanceof Error);assert.ok(error.message.includes(String(expected)));assert.ok(!error.message.includes('provider-private-detail'));return true;
   });
+ }
+});
+
+test('even authenticated legacy requests cannot inject a provider key through headers or body',async()=>{
+ const image=(await sharp({create:{width:80,height:80,channels:3,background:'white'}}).png().toBuffer()).toString('base64');
+ for(const file of ['../worker.js','../cloudflare-worker/worker.js']){
+  const worker=(await import(file)).default;
+  const request=new Request('https://worker.example/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer fixture', 'Content-Type':'application/json','X-Gemini-Key':'untrusted'},body:JSON.stringify({imageBase64:image,gemini_api_key:'untrusted'})});
+  const response=await worker.fetch(request,{APP_WORKER_TOKEN:'fixture'});
+  assert.equal(response.status,503);
  }
 });

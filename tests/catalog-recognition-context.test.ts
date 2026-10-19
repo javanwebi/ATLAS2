@@ -29,3 +29,8 @@ test('string-valued model feature lists are normalized before the existing site 
  assert.equal(result.visual_features.join(' '),'helical teeth');
  assert.deepEqual(result.technical_features,[]);assert.deepEqual(result.readable_markings,['6202ZZ']);assert.deepEqual(result.observed_specifications,[]);
 });
+
+test('wrapped model observations and common field aliases preserve the actual part description',()=>{
+ const value=normalizeRecognitionObservation({recognition:{what_you_see:'helical gear',part_type:'gear',visual_features:'angled teeth'}});
+ assert.equal(value.whatYouSee,'helical gear');assert.equal(value.detected_part_type,'gear');assert.deepEqual(value.visual_features,['angled teeth']);
+});

@@ -25,7 +25,7 @@ function corsHeaders(request, env) {
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Gemini-Key, X-Requested-With',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -451,7 +451,7 @@ async function handleMultimodalComparison(body, env, cors) {
     try {
       const response=await fetch(`${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent`,{
         method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},signal:AbortSignal.timeout(30000),
-        body:JSON.stringify({contents,generationConfig:{temperature:0.1,responseMimeType:'application/json',maxOutputTokens:4096}}),
+        body:JSON.stringify({contents,generationConfig:{temperature:0.1,responseMimeType:'application/json',maxOutputTokens:4096,...(body.response_schema ? {responseSchema:body.response_schema} : {})}}),
       });
       if(!response.ok)continue;
       const data=await response.json();
@@ -557,15 +557,10 @@ export default {
           );
         }
 
-        // 2. Resolve catalog items (864 products)
+        // Provider credentials are deployment secrets, never request input.
+        const apiKey = env?.GEMINI_API_KEY || SOURCE_AI_API_KEY;
+        if(!apiKey)return errorResponse('ai_not_configured','کلید هوش مصنوعی ورکر تنظیم نشده است.',503,cors);
         const catalog = await resolveCatalog(body);
-
-        // 3. Get Gemini API Key
-        const apiKey =
-          request.headers.get('X-Gemini-Key') ||
-          (env && env.GEMINI_API_KEY) ||
-          body.gemini_api_key ||
-          SOURCE_AI_API_KEY;
 
         // 4. Extract prompt
         let prompt = body.prompt;

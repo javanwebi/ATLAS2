@@ -35,9 +35,9 @@ test('both Worker entrypoints download every supplied image link before model co
    modelBody=JSON.parse(options!.body as string);return new Response('{"candidates":[{"content":{"parts":[{"text":"{\\"picks\\":[]}"}]}}]}',{status:200});
   }) as typeof fetch;
   try{
-   const request=new Request('https://worker.example/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-access'},body:JSON.stringify({task:'catalog-image-scan',messages:[{role:'user',content:[{type:'image_url',image_url:{url:'https://images.example/customer.png'}},{type:'image_url',image_url:{url:'https://images.example/catalogue.jpg'}}]}]})});
+   const request=new Request('https://worker.example/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-access'},body:JSON.stringify({task:'catalog-image-scan',response_schema:{type:'OBJECT',properties:{picks:{type:'ARRAY',items:{type:'INTEGER'}}}},messages:[{role:'user',content:[{type:'image_url',image_url:{url:'https://images.example/customer.png'}},{type:'image_url',image_url:{url:'https://images.example/catalogue.jpg'}}]}]})});
    const response=await worker.fetch(request,{APP_WORKER_TOKEN:'test-access',GEMINI_API_KEY:'fixture-key'});
-   assert.equal(response.status,200);assert.equal(downloads.length,2);assert.equal(modelBody.contents[0].parts.filter((part:any)=>part.inlineData).length,2);
+   assert.equal(response.status,200);assert.equal(modelBody.generationConfig.responseSchema.type,'OBJECT');assert.equal(downloads.length,2);assert.equal(modelBody.contents[0].parts.filter((part:any)=>part.inlineData).length,2);
   }finally{globalThis.fetch=original;}
  }
 });
