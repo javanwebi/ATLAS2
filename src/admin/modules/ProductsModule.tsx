@@ -409,7 +409,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
     setEditingVariantCode(firstSkuCode);
     setNewImgVariantCode(firstSkuCode);
     setPreviewSelectedVariantCode(firstSkuCode);
-    setPreviewActiveImageIdx(0);
+    setPreviewActiveImageIdx(-1);
     setEditorTab('family');
     setIsEditorOpen(true);
   };
@@ -456,7 +456,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
     setEditingVariantCode(firstCode);
     setNewImgVariantCode(firstCode);
     setPreviewSelectedVariantCode(firstCode);
-    setPreviewActiveImageIdx(0);
+    setPreviewActiveImageIdx(gallery.findIndex(img => img.scope === 'variant' && img.variantCode === firstCode));
     setVariantSearchQuery('');
     setEditorTab(initialTab);
     setIsEditorOpen(true);
@@ -789,9 +789,8 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
     const firstMatch = gal.findIndex(g => g.scope === 'variant' && g.variantCode === vCode);
     if (firstMatch >= 0) {
       setPreviewActiveImageIdx(firstMatch);
-    } else if (curImg && curImg.scope === 'variant' && curImg.variantCode !== vCode) {
-      const firstFam = gal.findIndex(g => g.scope === 'family');
-      if (firstFam >= 0) setPreviewActiveImageIdx(firstFam);
+    } else {
+      setPreviewActiveImageIdx(-1);
     }
   };
 
@@ -3401,7 +3400,7 @@ export const ProductsModule: React.FC<ProductsModuleProps> = () => {
                     const vars = draftFamily.variants || [];
                     const activeVar =
                       vars.find(v => v.code === previewSelectedVariantCode) || vars[0];
-                    const activeImg = gal[previewActiveImageIdx] || gal[0];
+                    const activeImg = gal[previewActiveImageIdx];
                     const vPrice = activeVar
                       ? activeVar.price ?? activeVar.prices?.retail ?? 0
                       : 0;

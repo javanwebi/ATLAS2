@@ -167,27 +167,27 @@ function extractFileNameFromUrl(url: string): string | undefined {
 export function buildDefaultGalleryImages(
   product: Product,
 ): ProductGalleryImage[] {
-  if (product.galleryImages && product.galleryImages.length > 0) {
-    return product.galleryImages.map((img, idx) => ({
-      ...img,
-      id: img.id || `img-${product.code}-${idx + 1}`,
-      url: getProductImageUrl(img.url || img.fileName || "") || img.url,
-      order: img.order ?? idx + 1,
-    }));
+  const codes = new Set((product.variants || []).map(v => v.code));
+  const gallery: ProductGalleryImage[] = product.galleryImages?.length
+    ? product.galleryImages.filter(img => img.scope === 'family' || (img.variantCode && codes.has(img.variantCode))).map((img, idx) => ({
+        ...img, id: img.id || `img-${product.code}-${idx + 1}`,
+        url: getProductImageUrl(img.url || img.fileName || '') || img.url,
+        order: img.order ?? idx + 1,
+      }))
+    : (product.images || []).map((url, idx) => ({
+        id: `img-${product.code}-${idx + 1}`, url: getProductImageUrl(url) || url,
+        fileName: extractFileNameFromUrl(url), scope: 'family' as const,
+        title: `تصویر عمومی خانواده ${product.name}`, order: idx + 1,
+      }));
+  for (const variant of product.variants || []) {
+    for (const [idx, originalUrl] of (variant.images || []).entries()) {
+      const url = getProductImageUrl(originalUrl) || originalUrl;
+      if (!url || gallery.some(img => img.scope === 'variant' && img.variantCode === variant.code && img.url === url)) continue;
+      gallery.push({id: `sku-${variant.code}-${idx}`, url, scope: 'variant', variantCode: variant.code,
+        title: `تصویر کد ${variant.code}`, order: gallery.length + 1});
+    }
   }
-
-  return (product.images || []).map((imgUrl, idx) => {
-    const resolved = getProductImageUrl(imgUrl) || imgUrl;
-    const fileName = extractFileNameFromUrl(resolved);
-    return {
-      id: `img-${product.code}-${idx + 1}`,
-      url: resolved,
-      fileName,
-      scope: "family" as const,
-      title: `تصویر عمومی خانواده ${product.name}`,
-      order: idx + 1,
-    };
-  });
+  return gallery;
 }
 
 function normalizeMergedProduct(

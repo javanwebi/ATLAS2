@@ -148,7 +148,7 @@ export const ProductDetailPage: React.FC = () => {
       const variantImgIdx = galleryImages.findIndex(
         (img) => img.scope === "variant" && img.variantCode === initialCode,
       );
-      setActiveImageIndex(variantImgIdx >= 0 ? variantImgIdx : 0);
+      setActiveImageIndex(variantImgIdx);
     } else {
       setActiveImageIndex(0);
     }
@@ -178,20 +178,8 @@ export const ProductDetailPage: React.FC = () => {
       return;
     }
 
-    // If this SKU has no dedicated image and current image belongs to another SKU,
-    // switch to the first general family image so another SKU's photo isn't shown misleadingly
-    if (
-      currentImg &&
-      currentImg.scope === "variant" &&
-      currentImg.variantCode !== newVariantCode
-    ) {
-      const firstFamilyIdx = galleryImages.findIndex(
-        (img) => img.scope === "family",
-      );
-      if (firstFamilyIdx >= 0) {
-        setActiveImageIndex(firstFamilyIdx);
-      }
-    }
+    // Missing evidence must never fall back to a different code or a family photo.
+    setActiveImageIndex(-1);
   };
 
   // 2. Customer clicks an image -> if linked to a SKU, automatically select that SKU;
@@ -314,7 +302,7 @@ export const ProductDetailPage: React.FC = () => {
         images:
           selectedVariant.images && selectedVariant.images.length > 0
             ? selectedVariant.images
-            : product.images,
+            : galleryImages.filter(img => img.scope === "variant" && img.variantCode === selectedVariant.code).map(img => img.url),
         technicalSpecs: combinedSpecs,
       }
     : {
@@ -330,7 +318,7 @@ export const ProductDetailPage: React.FC = () => {
   const isFavorited = isInWishlist(product.code);
   const similarProducts = getSimilarProducts(product, 4);
   const currentGalleryImage =
-    galleryImages[activeImageIndex] || galleryImages[0];
+    galleryImages[activeImageIndex];
 
   // Images connected to the currently selected variant
   const selectedVariantImagesCount = selectedVariant
@@ -527,7 +515,7 @@ export const ProductDetailPage: React.FC = () => {
           <div className="product-detail-gallery space-y-3.5">
             <div className="product-detail-image relative w-full pt-[82%] bg-gradient-to-b from-slate-50/70 to-white border border-slate-200/90 rounded-2xl overflow-hidden group flex items-center justify-center">
               <ProductImage
-                src={currentGalleryImage?.url || product.images[0]}
+                src={currentGalleryImage?.url}
                 alt={currentGalleryImage?.title || requestedProduct.name}
                 className="absolute inset-0 w-full h-full object-contain p-6 sm:p-8 group-hover:scale-105 transition-transform duration-300"
               />
@@ -571,6 +559,11 @@ export const ProductDetailPage: React.FC = () => {
               )}
             </div>
 
+            {!currentGalleryImage && selectedVariant && (
+              <p role="status" className="text-xs text-slate-600 leading-6 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                تصویر اختصاصی کد <strong dir="ltr">{selectedVariant.code}</strong> هنوز تأیید و ثبت نشده است. مشخصات زیر مربوط به همین کد است.
+              </p>
+            )}
             {/* Scope Notice */}
             {currentGalleryImage?.scope === "family" ? (
               <p className="text-xs text-slate-500 leading-6 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2">
