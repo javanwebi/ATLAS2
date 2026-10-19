@@ -21,3 +21,11 @@ export function catalogRecognitionContext(products:Product[],observation:any){
   familyNames:(row:CatalogImageRecord)=>[...new Set(row.bindings.map(b=>byFamily.get(b.familyCode)?.name).filter((name):name is string=>Boolean(name)))]
  };
 }
+
+/** Model JSON may use a string where an array was requested; never pass that into catalogue scorers. */
+export function normalizeRecognitionObservation(input:any){
+ const list=(value:unknown)=>Array.isArray(value) ? value.filter((entry):entry is string=>typeof entry==='string').slice(0,24) : typeof value==='string' && value.trim() ? [value] : [];
+ return {...input,visual_features:list(input?.visual_features),technical_features:list(input?.technical_features),
+  readable_markings:list(input?.readable_markings),unknown_parameters:list(input?.unknown_parameters),
+  observed_specifications:Array.isArray(input?.observed_specifications) ? input.observed_specifications : []};
+}

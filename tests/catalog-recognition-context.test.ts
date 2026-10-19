@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {catalogRecognitionContext} from '../src/services/catalogRecognitionContext';
+import {catalogRecognitionContext,normalizeRecognitionObservation} from '../src/services/catalogRecognitionContext';
 import {classifyVisualEvidence} from '../src/services/exhaustiveImageScan';
 import type {Product} from '../src/types';
 const products=[{code:'family',name:'بلبرینگ',active:true,categoryName:'انتقال نیرو',subcategory:'بلبرینگ شیار عمیق',technicalSpecs:[],prices:{},variants:[{code:'real-123',name:'بلبرینگ 6202ZZ',model:'6202ZZ',technicalSpecs:[{name:'قطر داخلی',value:'15',unit:'mm'}],price:99999}]}] as unknown as Product[];
@@ -22,4 +22,10 @@ test('same family with visible differences remains a labelled related result, ne
  const close={...comparison,contradictions:[],checks:{...comparison.checks,teeth:'match'}};
  assert.equal(classifyVisualEvidence(close),'very_similar');
  assert.equal(classifyVisualEvidence({...close,technicalChecks:[{field:'diameter',status:'mismatch'}]}),'related');
+});
+
+test('string-valued model feature lists are normalized before the existing site search engine uses join',()=>{
+ const result=normalizeRecognitionObservation({visual_features:'helical teeth',technical_features:null,readable_markings:'6202ZZ',unknown_parameters:{},observed_specifications:null});
+ assert.equal(result.visual_features.join(' '),'helical teeth');
+ assert.deepEqual(result.technical_features,[]);assert.deepEqual(result.readable_markings,['6202ZZ']);assert.deepEqual(result.observed_specifications,[]);
 });

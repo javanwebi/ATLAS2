@@ -15,6 +15,6 @@ export class RecognitionJobs<T> {
  private pump(){for(const [id,job] of this.jobs){if(this.active>=this.concurrency)break;if(job.status!=='queued')continue;
   job.status='running';this.active++;
   const run=job.run!;
-  Promise.resolve().then(()=>run(value=>{job.progress=value;})).then(result=>{job.result=result;job.status='complete';},(error)=>{job.error=error instanceof RecognitionServiceError ? error.message : 'بررسی کامل تصاویر انجام نشد؛ لطفاً دوباره تلاش کنید.';job.status='failed';}).finally(()=>{delete job.run;job.expires=Date.now()+this.ttl;this.active--;this.pump();});
+  Promise.resolve().then(()=>run(value=>{job.progress=value;})).then(result=>{job.result=result;job.status='complete';},(error)=>{console.warn('[Recognition job failed]',error instanceof RecognitionServiceError ? error.code : error?.name || 'UnknownError',error instanceof Error ? error.stack?.split('\n').slice(1,3).join('\n') : '');job.error=error instanceof RecognitionServiceError ? error.message : 'بررسی کامل تصاویر انجام نشد؛ لطفاً دوباره تلاش کنید.';job.status='failed';}).finally(()=>{delete job.run;job.expires=Date.now()+this.ttl;this.active--;this.pump();});
  }}
 }

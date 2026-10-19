@@ -1,4 +1,4 @@
-import { catalogRecognitionContext } from './src/services/catalogRecognitionContext';
+import { catalogRecognitionContext, normalizeRecognitionObservation } from './src/services/catalogRecognitionContext';
 import { CatalogVisualIndex } from './src/services/catalogVisualIndex';
 import { RecognitionServiceError } from './src/services/recognitionErrors';
 import { createVisionImagePublisher, cleanVisionImageLinks, type ImagePublisher } from './src/services/visionImageLinks';
@@ -4094,6 +4094,7 @@ ${prompt || 'شناسایی و مشخصات کامل قطعه صنعتی'}
 
   const aiAvailable = Boolean(raw && Object.keys(raw).length);
   if(!aiAvailable)throw recognitionFailure instanceof RecognitionServiceError ? recognitionFailure : new RecognitionServiceError('unavailable');
+  raw=normalizeRecognitionObservation(raw);
   // 3. Fallback baseline if all networks are down
   if (!raw || typeof raw !== 'object' || Object.keys(raw).length === 0) {
     raw = {
