@@ -568,7 +568,7 @@ interface CatalogItem {
 // Load real inventory identifiers, never the synthetic legacy summary.
 let CATALOG_ITEMS: CatalogItem[] = [];
 
-const inventoryCodes=new Set(inventorySource.flatMap(family=>family.variants.map(v=>v.code)));
+const inventoryCodes=new Set<string>(databaseEnabled()?[]:inventorySource.flatMap(family=>family.variants.map(v=>v.code)));
 function recognitionProducts() {
   const overrides=loadCatalogOverridesDb();
   const deleted=new Set(overrides.deletedCodes);
@@ -584,8 +584,7 @@ function recognitionProducts() {
 function refreshRecognitionCatalog() {
   CATALOG_ITEMS = recognitionCatalog(recognitionProducts(),inventoryCodes);
 }
-refreshRecognitionCatalog();
-console.log(`[Server] Loaded ${CATALOG_ITEMS.length} real inventory SKUs for recognition.`);
+if(!databaseEnabled())refreshRecognitionCatalog();
 
 // ============================================================================
 // VISUAL HASH ENGINE: exact/near-duplicate image search over catalog photos.
@@ -6462,6 +6461,8 @@ async function start() {
     CATALOG_OVERRIDES_CACHE=saved || {version:1,updatedAt:'',deletedCodes:[],families:{}};
     inventoryCodes.clear();for(const product of products)for(const variant of product.variants || [])inventoryCodes.add(variant.code);
   }
+  refreshRecognitionCatalog();
+  console.log(`[Server] Loaded ${CATALOG_ITEMS.length} real inventory SKUs for recognition.`);
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
