@@ -1,11 +1,13 @@
 import crypto from 'node:crypto';
 import type {Request,Response} from 'express';
-import {databaseEnabled,transaction,type SqlClient} from './connection';
+import {databaseEnabled,transaction,adoptedSchema,type SqlClient} from './connection';
+import {createAdoptedOrder} from './adoptedCheckout';
 import {getPortalIdentity} from '../../api/portal';
 import {readDocument,writeDocument} from './repository';
 const invalid=(message:string,status=400)=>Object.assign(new Error(message),{status});
 /** Pending order only. No browser callback can confirm payment or grant points. */
 export async function createOrder(client:SqlClient,profile:any,input:any){
+ if(adoptedSchema())return createAdoptedOrder(client,profile,input);
  const key=String(input.requestKey || '');if(!/^[0-9a-f-]{36}$/i.test(key))throw invalid('شناسه درخواست معتبر نیست.');
  if(!Array.isArray(input.items)||!input.items.length||input.items.length>200)throw invalid('سبد خرید معتبر نیست.');
  const items=input.items.map((i:any)=>({code:String(i.code),quantity:Number(i.quantity)})).sort((a:any,b:any)=>a.code.localeCompare(b.code));

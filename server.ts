@@ -1,6 +1,6 @@
 import {checkoutApi} from './server/db/checkout';
 import {runtimeApi} from './server/db/runtimeApi';
-import {databaseEnabled,database} from './server/db/connection';
+import {databaseEnabled,database,adoptedSchema} from './server/db/connection';
 import {readProducts,readDocument,writeDocument,saveProducts} from './server/db/repository';
 import {transaction} from './server/db/connection';
 import {installDatabaseProducts,normalizeMergedProduct} from './src/data/mockGenerator';
@@ -308,7 +308,7 @@ app.use('/api/catalog', (req, res, next) => {
   void requirePortalAdmin(req, res, next);
 });
 app.use('/api/ai', async (req,res,next)=>{
-  let authorized=false;try {const identity=await getPortalIdentity(req);authorized=!!(identity.user||identity.admin);}catch {}
+  let authorized=false;try {const identity=await getPortalIdentity(req);authorized=adoptedSchema()?identity.admin:!!(identity.user||identity.admin);}catch {}
   if(!authorized){const originalJson=res.json.bind(res);res.json=((body:any)=>originalJson(publicCatalog(body))) as typeof res.json;}
   next();
 });
@@ -459,7 +459,7 @@ async function saveCatalogOverridesDb(db: CatalogOverridesDb): Promise<void> {
       const baseline=await readDocument(client,'catalogue/base','global','reference');if(!baseline)throw new Error('Missing database catalogue baseline');
       const products=[];for(const code of codes){if(JSON.stringify(db.families[code])===JSON.stringify(previous.families[code]))continue;const base=baseline.find((p:any)=>p.code===code);if(db.families[code] || base)products.push(normalizeMergedProduct(base || null,db.families[code] || {}));}
       await saveProducts(client,products);
-      if(db.deletedCodes.length)await client.query('update public.product_families set active=false where code=any($1::text[])',[db.deletedCodes]);});
+      if(db.deletedCodes.length)await client.query(adoptedSchema()?'update public.catalog_families set is_active=false where code=any($1::text[])':'update public.product_families set active=false where code=any($1::text[])',[db.deletedCodes]);});
     CATALOG_OVERRIDES_CACHE=db;return;
   }
   db.updatedAt = new Date().toISOString();
@@ -475,7 +475,7 @@ async function saveCatalogOverridesDb(db: CatalogOverridesDb): Promise<void> {
 app.get('/api/catalog/overrides', async (req, res) => {
   res.setHeader('Cache-Control','private, no-store');res.setHeader('Vary','Cookie');
   try {const identity=await getPortalIdentity(req);const db=loadCatalogOverridesDb();
-  return res.json({status:'ok',success:true,data:identity.canReadCommerce?db:publicCatalog(db)});
+  return res.json({status:'ok',success:true,data:(adoptedSchema()?identity.admin:identity.canReadCommerce)?db:publicCatalog(db)});
   }catch {return res.status(503).json({success:false,message:'دریافت کاتالوگ ممکن نشد.'});}
 });
 

@@ -8,6 +8,10 @@
     {
       "file": "20261020083459_adopted_financial_and_storage.sql",
       "sha256": "f7629d59af67894cf6b7444fe94313ff847c63f8bbd093b144d2bb389d943cd1"
+    },
+    {
+      "file": "20261020091555_adopted_runtime_bridge.sql",
+      "sha256": "ec0b68cca498b84d8e79ba985443e859f9cd47db512c4582c0730a3faa52f15c"
     }
   ],
   "baselineSha256": "37d3cb13a519ba7b17d87829a796d64953f55c820f12e08e665d0f27daddd322"

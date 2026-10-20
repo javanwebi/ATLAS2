@@ -1,17 +1,20 @@
 import {createHash} from 'node:crypto';
-import {database,transaction,type SqlClient} from './connection';
+import {database,transaction,adoptedSchema,type SqlClient} from './connection';
+import {readAdoptedDocument,writeAdoptedDocument,adoptedUsers,persistAdoptedUsers,readAdoptedProducts,saveAdoptedProducts} from './adopted';
 import {domainTables,domainFor,type Domain} from './namespaces';
 type Row=Record<string,any>;
 export interface PortalDatabase {revision:number;users:Row[];values:Record<string,any>;otp?:Record<string,any>;}
 export const conflict=()=>Object.assign(new Error('اطلاعات هم‌زمان تغییر کرده است؛ دوباره بارگذاری کنید.'),{status:409});
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export async function readDocument(client:SqlClient,key:string,scope='global',domain?:Domain){
+ if(adoptedSchema())return readAdoptedDocument(client,key,scope);
  const table=domainTables[domain || domainFor(key)!];if(!table)throw new Error('Unknown data namespace');
  const meta=(await client.query('select value_kind,version from app_private.document_versions where namespace=$1 and scope_id=$2',[key,scope])).rows[0];if(!meta)return undefined;
  const rows=(await client.query(`select payload from public.${table} where namespace=$1 and scope_id=$2 and active order by position`,[key,scope])).rows;
  return meta.value_kind==='array' ? rows.map(row=>row.payload) : rows[0]?.payload ?? null;
 }
 export async function writeDocument(client:SqlClient,key:string,value:unknown,scope='global',ownerId?:string,domain?:Domain){
+ if(adoptedSchema())return writeAdoptedDocument(client,key,value,scope);
  const table=domainTables[domain || domainFor(key)!];if(!table)throw new Error('Unknown data namespace');
  await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[scope+':'+key]);
  const kind=Array.isArray(value)?'array':value && typeof value==='object'?'object':'scalar';
@@ -30,13 +33,14 @@ export async function writeDocument(client:SqlClient,key:string,value:unknown,sc
 export async function readPortal():Promise<PortalDatabase>{return transaction(async client=>{
  await client.query('set transaction isolation level repeatable read');
  const revision=Number((await client.query('select revision from app_private.portal_version where singleton=true')).rows[0].revision);
- const users=(await client.query('select payload from app_private.portal_users where active order by id')).rows.map(row=>row.payload);
+ const users=adoptedSchema()?await adoptedUsers(client):(await client.query('select payload from app_private.portal_users where active order by id')).rows.map(row=>row.payload);
  const keys=(await client.query("select namespace from app_private.document_versions where scope_id='global'")).rows.map(row=>row.namespace).filter(key=>domainFor(key));
  const values:Row={};for(const key of keys)values[key]=await readDocument(client,key);
- const otp=Object.fromEntries((await client.query('select id,payload from app_private.legacy_otp')).rows.map(row=>[row.id,row.payload]));
+ const otp=adoptedSchema()?{}:Object.fromEntries((await client.query('select id,payload from app_private.legacy_otp')).rows.map(row=>[row.id,row.payload]));
  return {revision,users,values,otp};
 });}
 export async function persistUsers(client:SqlClient,users:Row[]){
+ if(adoptedSchema())return persistAdoptedUsers(client,users);
  await client.query('update app_private.portal_users set active=false where not(id=any($1::text[]))',[users.map(user=>user.id)]);
  await client.query('update public.profiles set active=false where not(id=any($1::text[]))',[users.map(user=>user.id)]);
  for(const user of users){
@@ -51,15 +55,17 @@ export async function writePortal(db:PortalDatabase,expected:number){await trans
  const row=(await client.query('update app_private.portal_version set revision=revision+1 where singleton=true and revision=$1 returning revision',[expected])).rows[0];if(!row)throw conflict();
  await persistUsers(client,db.users);
  for(const [key,value] of Object.entries(db.values))if(domainFor(key))await writeDocument(client,key,value);
- for(const [key,value] of Object.entries(db.otp || {}))await client.query('insert into app_private.legacy_otp(id,payload) values($1,$2) on conflict(id) do update set payload=excluded.payload',[key,JSON.stringify(value)]);
+ if(!adoptedSchema())for(const [key,value] of Object.entries(db.otp || {}))await client.query('insert into app_private.legacy_otp(id,payload) values($1,$2) on conflict(id) do update set payload=excluded.payload',[key,JSON.stringify(value)]);
  db.revision=Number(row.revision);
  });}
 export async function readProducts(){
+ if(adoptedSchema())return readAdoptedProducts(database());
  const result=await database().query(`select f.payload,coalesce((select jsonb_agg(v.payload || jsonb_build_object('stock',s.quantity-s.reserved,'stockKnown',s.known,'prices',coalesce((select jsonb_object_agg(p.price_list_code,p.amount) from public.sku_prices p where p.variant_code=v.code),'{}'::jsonb)) order by v.code) from public.product_variants v join public.inventory_balances s on s.variant_code=v.code where v.family_code=f.code and v.active),'[]'::jsonb) as variants from public.product_families f where f.active order by f.code`);
  return result.rows.map(row=>({...row.payload,variants:row.variants}));
 }
 async function chunks(client:SqlClient,rows:Row[],sql:string){for(let index=0;index<rows.length;index+=500)await client.query(sql,[JSON.stringify(rows.slice(index,index+500))]);}
 export async function saveProducts(client:SqlClient,products:Row[]){
+ if(adoptedSchema())return saveAdoptedProducts(client,products);
  const families=products.map(p=>({code:p.code,name:p.name,category_slug:p.categorySlug || '',active:p.active!==false,payload:p}));
  const variants=products.flatMap(p=>(p.variants || []).map((v:Row)=>({code:v.code,family_code:p.code,name:v.name || p.name,active:v.active!==false,payload:v})));
  if(new Set(variants.map(v=>v.code)).size!==variants.length)throw new Error('Duplicate inventory SKU: review source data before import');

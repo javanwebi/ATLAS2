@@ -421,7 +421,7 @@ export default async function handler(
     if (req.method === "GET")
       return send(200, {
         success: true,
-        smsAvailable: databaseEnabled() ? true : smsConfigured(),
+        smsAvailable: databaseEnabled() ? process.env.SUPABASE_SMS_READY==='true' : smsConfigured(),
         revision: db.revision,
         user: auth.user ? safeUser(auth.user) : null,
         admin: auth.admin,

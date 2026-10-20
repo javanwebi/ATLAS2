@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import type {Request,Response} from 'express';
-import {database,databaseEnabled,transaction} from './connection';
+import {database,databaseEnabled,transaction,adoptedSchema} from './connection';
+import {adoptedOrders} from './adoptedCheckout';
+import {readAdoptedProducts,toman} from './adopted';
 import {readDocument,writeDocument,readProducts,conflict} from './repository';
 import {domainFor,canWriteCustomerNamespace,publicReadable} from './namespaces';
 import {getPortalIdentity} from '../../api/portal';
@@ -19,8 +21,14 @@ export async function runtimeApi(req:Request,res:Response){
     if(row.scope_id==='global' && !(identity.admin || publicReadable.has(row.namespace)))continue;
     values[row.namespace]=await readDocument(database(),row.namespace,row.scope_id);versions[row.namespace]=Number(row.version);
    }
-   if(identity.user)values.hyper_sanat_orders_v2=(await database().query('select payload from public.orders where active and (owner_id=$1 or legacy_customer_id=$1) order by updated_at desc',[identity.user.id])).rows.map(row=>row.payload);
-   const products=await readProducts();
+   if(identity.user)values.hyper_sanat_orders_v2=adoptedSchema()?await adoptedOrders(database(),identity.user.authUserId):(await database().query('select payload from public.orders where active and (owner_id=$1 or legacy_customer_id=$1) order by updated_at desc',[identity.user.id])).rows.map(row=>row.payload);
+   const products=adoptedSchema() && !identity.admin && identity.user?await transaction(async client=>{
+    const data=await readAdoptedProducts(client);await client.query("select set_config('request.jwt.claim.sub',$1,true)",[identity.user!.authUserId]);
+    const rows=(await client.query('select c.variant_code,c.currency,app_private.current_variant_price(c.variant_code) as amount from public.variant_commercial_specs c')).rows;
+    const prices=new Map(rows.map(row=>[row.variant_code,toman(row.amount,row.currency)]));
+    for(const family of data){for(const variant of family.variants){const amount=identity.user!.canViewPrices?prices.get(variant.code) || 0:0;variant.prices={base:amount,retail:amount,wholesale:amount,dealer:amount};variant.price=amount;if(!identity.user!.canViewStock){variant.stock=0;variant.stockKnown=false;}}family.prices=family.variants[0]?.prices || {base:0,retail:0,wholesale:0,dealer:0};family.stock=family.variants.reduce((s:number,v:any)=>s+v.stock,0);family.stockKnown=family.variants.every((v:any)=>v.stockKnown);}
+    return data;
+   }):await readProducts();
    return res.json({success:true,database:true,admin:identity.admin,userId:identity.user?.id || null,values,versions,products:identity.canReadCommerce?products:publicCatalog(products)});
   }
   checkOrigin(req);

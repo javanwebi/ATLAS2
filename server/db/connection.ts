@@ -1,5 +1,6 @@
 import pg from 'pg';
 export const databaseEnabled=()=>process.env.DATA_BACKEND==='postgres';
+export const adoptedSchema=()=>process.env.DATABASE_SCHEMA==='adopted';
 export const databaseEnvironment=()=>process.env.DATABASE_ENV || 'development';
 let pool:pg.Pool|undefined;
 export function database(){
