@@ -5,6 +5,7 @@ import {importSourceData} from './importData';
 const sha=(value:string|Buffer)=>crypto.createHash('sha256').update(value).digest('hex');
 const command=process.argv[2] || 'plan';
 try{
+ if((await database().query("select to_regclass('public.user_profiles') as adopted")).rows[0].adopted)throw new Error('This target uses the adopted catalog_* / user_profiles schema. Do not apply the legacy profiles/product_families migrations or importer. Use the reviewed SQL under supabase/adopted; see docs/database/ADOPTED_SCHEMA.md.');
  const files=(await fs.readdir('supabase/migrations')).filter(name=>/^\d+_.+\.sql$/.test(name)).sort();
  const migrations=await Promise.all(files.map(async name=>{const sql=await fs.readFile('supabase/migrations/'+name,'utf8');if(!sql.trim())throw new Error('Empty migration: '+name);return {name,version:name.split('_')[0],sha256:sha(sql),sql};}));
  const exists=(await database().query("select to_regclass('app_private.migration_checksums') as name")).rows[0].name;

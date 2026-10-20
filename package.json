@@ -23,7 +23,8 @@
     "db:backup": "node --import tsx scripts/database/backup.ts",
     "db:dev": "node --import tsx scripts/database/dev.ts",
     "db:auth:dev": "node --import tsx scripts/database/provisionAuth.ts",
-    "test:database": "node --import tsx --test tests/database/*.test.ts"
+    "test:database": "node --import tsx --test tests/database/*.test.ts",
+    "db:bundle:adopted": "node --import tsx scripts/database/bundleAdopted.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

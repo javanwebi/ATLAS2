@@ -1,3 +1,5 @@
+> Historical prototype notes. The actual owner-supplied schema now uses `user_profiles` / `catalog_*`. Read [ADOPTED_SCHEMA.md](ADOPTED_SCHEMA.md) first; do not run the legacy importer against the populated managed project.
+
 # Development evidence — 2026-10-19 UTC
 
 - `npm run lint`: passed.

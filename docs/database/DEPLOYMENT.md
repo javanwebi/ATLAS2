@@ -1,3 +1,5 @@
+> Historical prototype notes. The actual owner-supplied schema now uses `user_profiles` / `catalog_*`. Read [ADOPTED_SCHEMA.md](ADOPTED_SCHEMA.md) first; do not run the legacy importer against the populated managed project.
+
 # PostgreSQL / Supabase migration — review before cutover
 
 This branch is a development migration foundation, **not a completed production cutover**. `DATA_BACKEND` remains unset on the live deployment. It retains the old backend until an approved rollout. In PostgreSQL mode there is no business-data fallback to local files or browser storage.

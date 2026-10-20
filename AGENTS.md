@@ -9,3 +9,7 @@
 - Browser state is a scoped memory view in PostgreSQL mode. Never fall back to local persistent storage or repository JSON on a database outage. Temporary input, AI caches and build assets are not authoritative business data.
 - Run `npm run lint`, `npm run test:database`, `npm run test:portal` and `npm run build` when relevant. Full Auth/Storage integration also requires a real isolated Supabase stack; PGlite alone does not prove those integrations.
 - Keep the production feature flag off until live-volume data, browser exports, Auth identities, storage objects and financial workflows have passed reconciliation. Preserve the current UI.
+
+## Actual production schema (owner supplied 2026-10-20)
+
+The connected managed project now uses `user_profiles`, `catalog_families`, `catalog_variants` and the owner's 49-table master schema. Original `supabase/migrations` and importer target a DIFFERENT prototype schema; never apply those to the adopted database or import repository seeds over existing catalogue rows. Compatible follow-up SQL is in `supabase/adopted/migrations`. Inspect actual migration history and schema before any change. Do not switch DATA_BACKEND on the live app until adapters target these actual tables.
