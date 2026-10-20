@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import { Brand } from '../types';
 
 function createBrandBadgeSvg(title: string, subtitle: string, accent: string, darkBg = '#1E293B'): string {
@@ -157,7 +158,7 @@ export const BRANDS: Brand[] = [
 export function getManagedBrands(): Brand[] {
   if (typeof window !== 'undefined') {
     try {
-      const stored = window.localStorage.getItem('atlas_admin_brands_v1');
+      const stored = durableStorage.getItem('atlas_admin_brands_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {

@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
 
@@ -21,7 +22,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({
   const storageKey = `${WISHLIST_STORAGE_KEY}:${currentUser?.id || "guest"}`;
   const read = (key: string): string[] => {
     try {
-      const data = JSON.parse(localStorage.getItem(key) || "[]");
+      const data = JSON.parse(durableStorage.getItem(key) || "[]");
       return Array.isArray(data)
         ? data.filter((x) => typeof x === "string")
         : [];
@@ -53,7 +54,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (state.key === storageKey)
       try {
-        localStorage.setItem(storageKey, JSON.stringify(state.items));
+        durableStorage.setItem(storageKey, JSON.stringify(state.items));
       } catch {}
   }, [state, storageKey]);
 

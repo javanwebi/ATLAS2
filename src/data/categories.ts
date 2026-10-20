@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import { BELT_MENU, matchesBeltSelection } from "./beltNavigation";
 import type { Category, Product } from '../types';
 import { USER_PRODUCTS, USER_PRODUCTS_RAW, categorySlugFor } from './userProducts';
@@ -62,7 +63,7 @@ export const CATEGORIES_STORAGE_KEY = 'atlas_admin_categories_v1';
 export function getManagedCategories(): EnhancedCategory[] {
   if (typeof window === 'undefined') return CATEGORIES;
   try {
-    const raw = window.localStorage.getItem(CATEGORIES_STORAGE_KEY);
+    const raw = durableStorage.getItem(CATEGORIES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {

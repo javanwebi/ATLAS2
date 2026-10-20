@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 import { Customer, RegisterPayload, AuthResponse } from "../types";
 import { portalRequest, hydratePortal } from "./portalRepository";
 
@@ -47,7 +48,7 @@ export class AuthService {
   static getCurrentUser(): Customer | null {
     try {
       return JSON.parse(
-        localStorage.getItem("hyper_sanat_auth_state_v2") || "null",
+        durableStorage.getItem("hyper_sanat_auth_state_v2") || "null",
       );
     } catch {
       return null;
@@ -55,8 +56,8 @@ export class AuthService {
   }
   static persistUser(user: Customer | null) {
     if (user)
-      localStorage.setItem("hyper_sanat_auth_state_v2", JSON.stringify(user));
-    else localStorage.removeItem("hyper_sanat_auth_state_v2");
+      durableStorage.setItem("hyper_sanat_auth_state_v2", JSON.stringify(user));
+    else durableStorage.removeItem("hyper_sanat_auth_state_v2");
   }
   static getLocalRegisteredUsers(): Customer[] {
     return [];

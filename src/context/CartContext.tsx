@@ -1,6 +1,7 @@
+import {durableStorage,databaseStorageEnabled} from "../services/durableStorage";
 import { getProductByCode } from "../data/mockGenerator";
 import { portalRequest, hydratePortal } from "../services/portalRepository";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import {
   Product,
   PriceTiers,
@@ -108,7 +109,7 @@ interface CartContextType {
     shippingMethod: ShippingMethod;
     paymentMethod: "online" | "transfer" | "credit";
     receiptImage?: string;
-  }) => Order;
+  }) => Promise<Order>;
   // Computed values
   itemCount: number;
   subtotalAmount: number;
@@ -138,6 +139,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { currentUser, priceLayer, activeRole, addClubPoints, openAuthModal } =
     useAuth();
+  const checkoutRequest=useRef<{fingerprint:string;key:string}|null>(null);
   const [, setContentVersion] = useState(0);
   useEffect(() => {
     const update = () => setContentVersion((v) => v + 1);
@@ -149,7 +151,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   // Cart
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      const saved = durableStorage.getItem(CART_STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -159,7 +161,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   // Saved for later
   const [savedForLater, setSavedForLater] = useState<Product[]>(() => {
     try {
-      const saved = localStorage.getItem(SAVED_STORAGE_KEY);
+      const saved = durableStorage.getItem(SAVED_STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -170,7 +172,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   const [allInquiries, setInquiries] = useState<InquiryItem[]>(() => {
     try {
       const saved = JSON.parse(
-        localStorage.getItem(INQUIRY_STORAGE_KEY) || "[]",
+        durableStorage.getItem(INQUIRY_STORAGE_KEY) || "[]",
       );
       return Array.isArray(saved) ? saved.filter((i) => i.customerId) : [];
     } catch {
@@ -185,7 +187,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     const sync = () => {
       try {
         const rows = JSON.parse(
-          localStorage.getItem("atlas_admin_inquiries_v1") || "[]",
+          durableStorage.getItem("atlas_admin_inquiries_v1") || "[]",
         );
         if (currentUser)
           setInquiries(
@@ -218,7 +220,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   // Orders
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
-      const saved = localStorage.getItem(ORDERS_STORAGE_KEY);
+      const saved = durableStorage.getItem(ORDERS_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
     } catch {
       // ignore
@@ -226,10 +228,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     return [];
   });
 
+  useEffect(()=>{const update=()=>{if(!databaseStorageEnabled())return;setCart(JSON.parse(durableStorage.getItem(CART_STORAGE_KEY)||'[]'));setSavedForLater(JSON.parse(durableStorage.getItem(SAVED_STORAGE_KEY)||'[]'));setOrders(JSON.parse(durableStorage.getItem(ORDERS_STORAGE_KEY)||'[]'));};window.addEventListener('sanat-durable-hydrated',update);return()=>window.removeEventListener('sanat-durable-hydrated',update);},[]);
+
   // SMS logs
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>(() => {
     try {
-      const saved = localStorage.getItem(SMS_STORAGE_KEY);
+      const saved = durableStorage.getItem(SMS_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
     } catch {
       // ignore
@@ -241,7 +245,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   const [stockOverrides, setStockOverrides] = useState<Record<string, number>>(
     () => {
       try {
-        const saved = localStorage.getItem(STOCK_STORAGE_KEY);
+        const saved = durableStorage.getItem(STOCK_STORAGE_KEY);
         return saved ? JSON.parse(saved) : {};
       } catch {
         return {};
@@ -261,7 +265,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sync to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      durableStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {
       // ignore
     }
@@ -269,7 +273,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(savedForLater));
+      durableStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(savedForLater));
     } catch {
       // ignore
     }
@@ -277,7 +281,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+      durableStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
     } catch {
       // ignore
     }
@@ -285,7 +289,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(smsLogs));
+      durableStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(smsLogs));
     } catch {
       // ignore
     }
@@ -293,7 +297,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(stockOverrides));
+      durableStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(stockOverrides));
     } catch {
       // ignore
     }
@@ -301,7 +305,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(INQUIRY_STORAGE_KEY, JSON.stringify(allInquiries));
+      durableStorage.setItem(INQUIRY_STORAGE_KEY, JSON.stringify(allInquiries));
     } catch {
       // ignore
     }
@@ -544,12 +548,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   // Place order function
-  const placeOrder = (params: {
+  const placeOrder = async (params: {
     address: Address;
     shippingMethod: ShippingMethod;
     paymentMethod: "online" | "transfer" | "credit";
     receiptImage?: string;
-  }): Order => {
+  }): Promise<Order> => {
+    if(databaseStorageEnabled()){
+      const fingerprint=JSON.stringify({user:currentUser?.id,items:cart.map(item=>({code:item.product.code,quantity:item.quantity})),address:params.address.id,shipping:params.shippingMethod.id,payment:params.paymentMethod});
+      if(checkoutRequest.current?.fingerprint!==fingerprint)checkoutRequest.current={fingerprint,key:crypto.randomUUID()};
+      const res=await fetch('/api/checkout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestKey:checkoutRequest.current.key,items:cart.map(item=>({code:item.product.code,quantity:item.quantity})),addressId:params.address.id,shippingId:params.shippingMethod.id,paymentMethod:params.paymentMethod})});
+      const data=await res.json();if(!res.ok || !data.success)throw new Error(data.message || 'ثبت سفارش انجام نشد.');setOrders(previous=>[data.order,...previous]);clearCart();return data.order;
+    }
     const orderNum = "ATLAS-1403-" + Math.floor(1000 + Math.random() * 9000);
 
     const orderItems: OrderItem[] = cart.map((item) => {

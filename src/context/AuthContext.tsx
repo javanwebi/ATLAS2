@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Customer, UserRole, PriceTiers, Address, RegisterPayload, AuthResponse, AuthCredentials } from '../types';
 import { AuthService } from '../services/authService';
@@ -86,10 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     try {
       if (currentUser) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
+        durableStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         setActiveRole(currentUser.role);
       } else {
-        localStorage.removeItem(STORAGE_KEY);
+        durableStorage.removeItem(STORAGE_KEY);
         setActiveRole('guest');
       }
     } catch {
@@ -186,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     setActiveRole('guest');
     setLatestCredentials(null);
-    localStorage.removeItem(STORAGE_KEY);
+    durableStorage.removeItem(STORAGE_KEY);
   };
 
   const switchRole = (role: UserRole) => {

@@ -1,3 +1,4 @@
+import {durableStorage} from "../../services/durableStorage";
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
@@ -167,7 +168,7 @@ export const PlantMachineryPassport: React.FC = () => {
   const { addToCart } = useCart();
   const [machines, setMachines] = useState<PlantMachine[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = durableStorage.getItem(STORAGE_KEY);
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -209,7 +210,7 @@ export const PlantMachineryPassport: React.FC = () => {
   // Save to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(machines));
+      durableStorage.setItem(STORAGE_KEY, JSON.stringify(machines));
     } catch (e) {
       console.error(e);
     }

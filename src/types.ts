@@ -192,6 +192,7 @@ export interface AuthCredentials {
 }
 
 export interface AuthResponse {
+  requiresPhoneVerification?:boolean;
   success: boolean;
   message?: string;
   user?: Customer;

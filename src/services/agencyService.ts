@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 import {
   AgencyApplication,
   FinancialTransaction,
@@ -85,20 +86,20 @@ export const agencyService = {
   // --- Applications ---
   getApplications(): AgencyApplication[] {
     try {
-      const stored = localStorage.getItem(APPLICATIONS_KEY);
+      const stored = durableStorage.getItem(APPLICATIONS_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
     } catch {
       // ignore
     }
-    localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(INITIAL_APPLICATIONS));
+    durableStorage.setItem(APPLICATIONS_KEY, JSON.stringify(INITIAL_APPLICATIONS));
     return INITIAL_APPLICATIONS;
   },
 
   saveApplications(apps: AgencyApplication[]): void {
     try {
-      localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(apps));
+      durableStorage.setItem(APPLICATIONS_KEY, JSON.stringify(apps));
     } catch {
       // ignore
     }
@@ -183,15 +184,15 @@ export const agencyService = {
 
     try {
       const dealersKey = 'hyper_sanat_approved_dealers_v1';
-      const stored = localStorage.getItem(dealersKey);
+      const stored = durableStorage.getItem(dealersKey);
       const list = stored ? JSON.parse(stored) : [];
       const filtered = list.filter((d: any) => d.phone !== app.phone);
       filtered.push(dealerAccount);
-      localStorage.setItem(dealersKey, JSON.stringify(filtered));
+      durableStorage.setItem(dealersKey, JSON.stringify(filtered));
 
       // Also register into users store so login recognizes dealer role
       const usersKey = 'hyper_sanat_registered_users_v2';
-      const usersStored = localStorage.getItem(usersKey);
+      const usersStored = durableStorage.getItem(usersKey);
       const userList = usersStored ? JSON.parse(usersStored) : [];
       const userIdx = userList.findIndex((u: any) => u.phone === app.phone);
       const dealerUserData = {
@@ -215,7 +216,7 @@ export const agencyService = {
       } else {
         userList.push(dealerUserData);
       }
-      localStorage.setItem(usersKey, JSON.stringify(userList));
+      durableStorage.setItem(usersKey, JSON.stringify(userList));
     } catch {
       // ignore
     }
@@ -260,14 +261,14 @@ export const agencyService = {
   // --- SMS Logs ---
   getSmsLogs(): SmsLog[] {
     try {
-      const stored = localStorage.getItem(SMS_LOGS_KEY);
+      const stored = durableStorage.getItem(SMS_LOGS_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
     } catch {
       // ignore
     }
-    localStorage.setItem(SMS_LOGS_KEY, JSON.stringify(INITIAL_SMS_LOGS));
+    durableStorage.setItem(SMS_LOGS_KEY, JSON.stringify(INITIAL_SMS_LOGS));
     return INITIAL_SMS_LOGS;
   },
 
@@ -289,7 +290,7 @@ export const agencyService = {
     };
     logs.unshift(newLog);
     try {
-      localStorage.setItem(SMS_LOGS_KEY, JSON.stringify(logs));
+      durableStorage.setItem(SMS_LOGS_KEY, JSON.stringify(logs));
     } catch {
       // ignore
     }
@@ -318,7 +319,7 @@ export const agencyService = {
 
   getDepositReceipts(): DepositReceipt[] {
     try {
-      const stored = localStorage.getItem(RECEIPTS_KEY);
+      const stored = durableStorage.getItem(RECEIPTS_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -340,7 +341,7 @@ export const agencyService = {
     };
     receipts.unshift(newReceipt);
     try {
-      localStorage.setItem(RECEIPTS_KEY, JSON.stringify(receipts));
+      durableStorage.setItem(RECEIPTS_KEY, JSON.stringify(receipts));
     } catch {
       // ignore
     }
@@ -357,7 +358,7 @@ export const agencyService = {
   // --- Supply Requests ---
   getSupplyRequests(): SupplyRequest[] {
     try {
-      const stored = localStorage.getItem(SUPPLY_KEY);
+      const stored = durableStorage.getItem(SUPPLY_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -379,7 +380,7 @@ export const agencyService = {
     };
     requests.unshift(newReq);
     try {
-      localStorage.setItem(SUPPLY_KEY, JSON.stringify(requests));
+      durableStorage.setItem(SUPPLY_KEY, JSON.stringify(requests));
     } catch {
       // ignore
     }
@@ -389,7 +390,7 @@ export const agencyService = {
   // --- Dealer Internal Messages ---
   getDealerMessages(): TicketMessage[] {
     try {
-      const stored = localStorage.getItem(MESSAGES_KEY);
+      const stored = durableStorage.getItem(MESSAGES_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -412,7 +413,7 @@ export const agencyService = {
     };
     messages.push(newMsg);
     try {
-      localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+      durableStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
     } catch {
       // ignore
     }

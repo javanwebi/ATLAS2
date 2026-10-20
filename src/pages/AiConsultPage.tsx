@@ -1,3 +1,4 @@
+import {durableStorage} from "../services/durableStorage";
 import {WorkspaceCatalog} from '../components/search/WorkspaceCatalog';
 import {MemberAccess,memberPath} from '../components/storefront/MemberAccess';
 import {useAuth} from '../context/AuthContext';
@@ -250,12 +251,12 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
   useEffect(() => {
     const loadSessionsFromStorage = () => {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = durableStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed: ChatSession[] = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setSessions(parsed);
-            const savedActiveId = localStorage.getItem(ACTIVE_SESSION_KEY);
+            const savedActiveId = durableStorage.getItem(ACTIVE_SESSION_KEY);
             const matched = parsed.find(s => s.id === savedActiveId) || parsed[0];
             setActiveSessionId(matched.id);
             setMessages(matched.messages || []);
@@ -285,7 +286,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
   const saveSessionsToStorage = (updatedSessions: ChatSession[]) => {
     setSessions(updatedSessions);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
+      durableStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
     } catch {}
   };
 
@@ -301,7 +302,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
     saveSessionsToStorage(updated);
     setActiveSessionId(newId);
     try {
-      localStorage.setItem(ACTIVE_SESSION_KEY, newId);
+      durableStorage.setItem(ACTIVE_SESSION_KEY, newId);
     } catch {}
     setMessages([]);
     setInputQuery('');
@@ -317,7 +318,7 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
     if (target) {
       setActiveSessionId(target.id);
       try {
-        localStorage.setItem(ACTIVE_SESSION_KEY, target.id);
+        durableStorage.setItem(ACTIVE_SESSION_KEY, target.id);
       } catch {}
       setMessages(target.messages || []);
       setActiveWorkspaceTab('chat');
@@ -340,8 +341,8 @@ export const AiConsultPage: React.FC<{ identificationOnly?: boolean }> = ({ iden
   };
 
   const clearAllHistory = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(ACTIVE_SESSION_KEY);
+    durableStorage.removeItem(STORAGE_KEY);
+    durableStorage.removeItem(ACTIVE_SESSION_KEY);
     setSessions([]);
     createNewSession(false);
     setShowSettingsModal(false);

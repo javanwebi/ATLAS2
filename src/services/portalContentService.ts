@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 import { persistPortalCache } from "./portalRepository";
 import { Customer } from "../types";
 
@@ -144,7 +145,7 @@ const STORAGE_KEYS = {
   CUSTOMER_OVERRIDES: "atlas_portal_customer_overrides_v1",
 };
 
-const DEFAULT_CLUB_MILESTONES: ClubTierMilestoneConfig[] = [
+export const DEFAULT_CLUB_MILESTONES: ClubTierMilestoneConfig[] = [
   {
     code: "C",
     tierKey: "bronze",
@@ -228,7 +229,7 @@ const DEFAULT_CLUB_MILESTONES: ClubTierMilestoneConfig[] = [
   },
 ];
 
-const DEFAULT_CONSUMER_CLUB_MILESTONES: ClubTierMilestoneConfig[] =
+export const DEFAULT_CONSUMER_CLUB_MILESTONES: ClubTierMilestoneConfig[] =
   DEFAULT_CLUB_MILESTONES.map((m, index) => ({
     ...m,
     publicTitle: ["همراه", "نقره‌ای", "طلایی", "پلاتینیوم"][index],
@@ -239,7 +240,7 @@ const DEFAULT_CONSUMER_CLUB_MILESTONES: ClubTierMilestoneConfig[] =
     specialEvents: [],
   }));
 
-const DEFAULT_BANNERS: PortalBannerItem[] = [
+export const DEFAULT_BANNERS: PortalBannerItem[] = [
   ...(["consumer", "high_volume"] as const).map((portal) => ({
     id: `bnr-discover-${portal}`,
     portal,
@@ -294,7 +295,7 @@ const DEFAULT_BANNERS: PortalBannerItem[] = [
   },
 ];
 
-const DEFAULT_ANNOUNCEMENTS: PortalAnnouncementItem[] = [
+export const DEFAULT_ANNOUNCEMENTS: PortalAnnouncementItem[] = [
   {
     id: "ann-consumer-1",
     portal: "consumer",
@@ -323,7 +324,7 @@ const DEFAULT_ANNOUNCEMENTS: PortalAnnouncementItem[] = [
   },
 ];
 
-const DEFAULT_PORTAL_CONFIGS: Record<PortalTargetType, PortalLayoutConfig> = {
+export const DEFAULT_PORTAL_CONFIGS: Record<PortalTargetType, PortalLayoutConfig> = {
   consumer: {
     portal: "consumer",
     menus: [
@@ -523,7 +524,7 @@ export const portalContentService = {
   // --- BANNERS (طراحی بنر جمعی و تکی برای هر دو پنل) ---
   getBanners(): PortalBannerItem[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.BANNERS);
+      const raw = durableStorage.getItem(STORAGE_KEYS.BANNERS);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
@@ -584,7 +585,7 @@ export const portalContentService = {
   // --- ANNOUNCEMENTS & CONTENT CARDS (محتواهای جمعی و تکی) ---
   getAnnouncements(): PortalAnnouncementItem[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS);
+      const raw = durableStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
@@ -632,7 +633,7 @@ export const portalContentService = {
     portal: PortalTargetType = "high_volume",
   ): ClubTierMilestoneConfig[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.CLUB_MILESTONES);
+      const raw = durableStorage.getItem(STORAGE_KEYS.CLUB_MILESTONES);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && portal === "high_volume") return parsed;
@@ -666,7 +667,7 @@ export const portalContentService = {
   // --- PORTAL LAYOUT, MENUS, UI TEXTS & PERMISSIONS ---
   getPortalConfigs(): Record<PortalTargetType, PortalLayoutConfig> {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.PORTAL_CONFIGS);
+      const raw = durableStorage.getItem(STORAGE_KEYS.PORTAL_CONFIGS);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && (parsed.consumer || parsed.high_volume)) {
@@ -734,7 +735,7 @@ export const portalContentService = {
   // --- INDIVIDUAL CUSTOMER OVERRIDES (شخصی‌سازی تکی دسترسی‌ها و کادرها برای یک مشتری خاص) ---
   getCustomerOverrides(): CustomerIndividualOverride[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMER_OVERRIDES);
+      const raw = durableStorage.getItem(STORAGE_KEYS.CUSTOMER_OVERRIDES);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;

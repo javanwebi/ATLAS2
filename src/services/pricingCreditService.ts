@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 import { persistPortalCache } from './portalRepository';
 import * as XLSX from 'xlsx';
 import { ClubTier, Customer, Product } from '../types';
@@ -219,7 +220,7 @@ function notifyListeners() {
 }
 
 // ۱. لیست‌های قیمت پیش‌فرض (A, B, C, D برای پنل مدیریت ↔ طلایی ویژه، طلایی، نقره‌ای، برنزی برای پنل /account)
-const INITIAL_PRICE_LISTS: DynamicPriceList[] = [
+export const INITIAL_PRICE_LISTS: DynamicPriceList[] = [
   {
     id: 'pl-grade-a',
     code: 'A',
@@ -312,7 +313,7 @@ export const pricingCreditService = {
   // --- Customer Grades (کریدبندی A, B, C, D) ---
   getGrades(): CustomerGrade[] {
     try {
-      const stored = localStorage.getItem(GRADES_STORAGE_KEY);
+      const stored = durableStorage.getItem(GRADES_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed;
@@ -362,7 +363,7 @@ export const pricingCreditService = {
   getPriceLists(): DynamicPriceList[] {
     let lists: DynamicPriceList[] | null = null;
     try {
-      const stored = localStorage.getItem(PRICE_LISTS_STORAGE_KEY);
+      const stored = durableStorage.getItem(PRICE_LISTS_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) lists = parsed;
@@ -978,7 +979,7 @@ export const pricingCreditService = {
   // --- Price List History Management (تاریخچه لیست قیمت‌های اضافه‌شده و قبلی + قابلیت حذف) ---
   getPriceListHistory(): PriceListHistoryRecord[] {
     try {
-      const stored = localStorage.getItem(PRICE_LIST_HISTORY_KEY);
+      const stored = durableStorage.getItem(PRICE_LIST_HISTORY_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -1079,7 +1080,7 @@ export const pricingCreditService = {
     customerId: string,
     data: { priceListCode?: string; clubTier?: ClubPortalTier; gradeId?: string; creditLimit?: number }
   ): CustomerApprovalRecord | undefined {
-    const crm = JSON.parse(localStorage.getItem('atlas_admin_customers_v1') || '[]') as Customer[];
+    const crm = JSON.parse(durableStorage.getItem('atlas_admin_customers_v1') || '[]') as Customer[];
     const target = crm.find(c => c.id === customerId && c.approvedB2B === true);
     if (target) {
       const list = data.priceListCode ? this.getPriceListByCode(data.priceListCode) : undefined;
@@ -1111,7 +1112,7 @@ export const pricingCreditService = {
   // --- Customer Registration Approvals & Legacy Customer Grading ---
   getCustomerApprovals(): CustomerApprovalRecord[] {
     try {
-      const stored = localStorage.getItem(CUSTOMERS_APPROVAL_KEY);
+      const stored = durableStorage.getItem(CUSTOMERS_APPROVAL_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed;
@@ -1269,7 +1270,7 @@ export const pricingCreditService = {
 
     // Sync active session if logged in
     try {
-      const activeUser = localStorage.getItem('hyper_sanat_auth_state_v2');
+      const activeUser = durableStorage.getItem('hyper_sanat_auth_state_v2');
       if (activeUser) {
         const parsed = JSON.parse(activeUser);
         if (parsed.phone === customer.phone) {
@@ -1305,7 +1306,7 @@ export const pricingCreditService = {
   // --- Club Rewards Management (انتخاب جوایز برای هر مشتری تکی یا دسته‌جمعی) ---
   getClubRewards(): ClubRewardAssignment[] {
     try {
-      const stored = localStorage.getItem(CLUB_REWARDS_STORAGE_KEY);
+      const stored = durableStorage.getItem(CLUB_REWARDS_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed;
@@ -1499,7 +1500,7 @@ export const pricingCreditService = {
   },
 
   getAllCustomers(): Customer[] {
-    try { return JSON.parse(localStorage.getItem('atlas_admin_customers_v1') || '[]').filter((c: Customer) => c.approvedB2B === true); } catch { return []; }
+    try { return JSON.parse(durableStorage.getItem('atlas_admin_customers_v1') || '[]').filter((c: Customer) => c.approvedB2B === true); } catch { return []; }
   },
 
   getAllCatalogSkuItems(): CatalogSkuPriceItem[] {
@@ -1590,7 +1591,7 @@ export const pricingCreditService = {
 
   getRewardAssignments(): CustomerRewardAssignment[] {
     try {
-      const stored = localStorage.getItem('atlas_customer_reward_assignments_v1');
+      const stored = durableStorage.getItem('atlas_customer_reward_assignments_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed;

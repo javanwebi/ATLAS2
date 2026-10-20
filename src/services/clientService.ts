@@ -1,3 +1,4 @@
+import {durableStorage} from "./durableStorage";
 export interface ClientLogo {
   id: string;
   name: string;
@@ -18,7 +19,7 @@ const EVENT_NAME = 'atlas_clients_updated';
 import { MOSHTARI_CLIENTS } from '../assets/moshtariAssets';
 
 // Default Iranian industrial clients using uploaded images from /src/assets/moshtari
-const DEFAULT_CLIENTS: ClientLogo[] = MOSHTARI_CLIENTS.map((item, idx) => ({
+export const DEFAULT_CLIENTS: ClientLogo[] = MOSHTARI_CLIENTS.map((item, idx) => ({
   id: item.id,
   name: item.name,
   englishName: item.industry,
@@ -32,7 +33,7 @@ const DEFAULT_CLIENTS: ClientLogo[] = MOSHTARI_CLIENTS.map((item, idx) => ({
 class ClientService {
   private getStorage(): ClientLogo[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = durableStorage.getItem(STORAGE_KEY);
       if (!data) {
         this.saveStorage(DEFAULT_CLIENTS);
         return DEFAULT_CLIENTS;
@@ -45,7 +46,7 @@ class ClientService {
 
   private saveStorage(clients: ClientLogo[]): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+      durableStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event(EVENT_NAME));
       }

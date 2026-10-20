@@ -1,3 +1,4 @@
+import {durableStorage,databaseStorageEnabled,refreshDurableStorage,hydrateMemory,flushDurableChanges} from "./durableStorage";
 // Browser storage is a rendering cache. Authorization and durable data live in /api/portal.
 export const PORTAL_CACHE_KEYS = [
   "atlas_admin_inquiries_v1",
@@ -43,20 +44,20 @@ export function clearPortalCache() {
   isAdmin = false;
   dirty = {};
   saveError = null;
-  for (const key of PORTAL_CACHE_KEYS) localStorage.removeItem(key);
-  localStorage.removeItem("hyper_sanat_auth_state_v2");
-  localStorage.removeItem("atlas_admin_auth_v1");
-  localStorage.removeItem("hyper_sanat_registered_users_v2");
+  for (const key of PORTAL_CACHE_KEYS) durableStorage.removeItem(key);
+  durableStorage.removeItem("hyper_sanat_auth_state_v2");
+  durableStorage.removeItem("atlas_admin_auth_v1");
+  durableStorage.removeItem("hyper_sanat_registered_users_v2");
 }
 export async function hydratePortal() {
   if (saving) await saving;
   if (saveError) throw saveError;
   const data = await portalRequest();
   // Keep a recoverable copy of pre-migration browser data; never upload it automatically.
-  if (!localStorage.getItem("atlas_portal_cache_migrated_v1")) {
+  if (!durableStorage.getItem("atlas_portal_cache_migrated_v1")) {
     const previous: Record<string, unknown> = {};
     for (const key of PORTAL_CACHE_KEYS) {
-      const raw = localStorage.getItem(key);
+      const raw = durableStorage.getItem(key);
       if (raw) {
         try {
           previous[key] = JSON.parse(raw);
@@ -66,19 +67,21 @@ export async function hydratePortal() {
       }
     }
     if (Object.keys(previous).length)
-      localStorage.setItem(
+      durableStorage.setItem(
         "atlas_portal_local_backup_v1",
         JSON.stringify(previous),
       );
-    localStorage.setItem("atlas_portal_cache_migrated_v1", "true");
+    durableStorage.setItem("atlas_portal_cache_migrated_v1", "true");
   }
+  if(databaseStorageEnabled())await refreshDurableStorage();
+  hydrateMemory(()=>{
   revision = data.revision;
   isAdmin = data.admin;
   for (const key of PORTAL_CACHE_KEYS) {
     const value = data.values?.[key];
-    if (value !== undefined) localStorage.setItem(key, JSON.stringify(value));
+    if (value !== undefined) durableStorage.setItem(key, JSON.stringify(value));
     else if (key === "atlas_portal_layout_configs_v1")
-      localStorage.removeItem(key);
+      durableStorage.removeItem(key);
     else if (
       isAdmin &&
       [
@@ -87,16 +90,17 @@ export async function hydratePortal() {
         "atlas_portal_club_milestones_v1",
       ].includes(key)
     )
-      localStorage.removeItem(key);
-    else localStorage.setItem(key, "[]");
+      durableStorage.removeItem(key);
+    else durableStorage.setItem(key, "[]");
   }
-  localStorage.removeItem("hyper_sanat_registered_users_v2");
+  durableStorage.removeItem("hyper_sanat_registered_users_v2");
   if (data.user)
-    localStorage.setItem(
+    durableStorage.setItem(
       "hyper_sanat_auth_state_v2",
       JSON.stringify(data.user),
     );
-  else localStorage.removeItem("hyper_sanat_auth_state_v2");
+  else durableStorage.removeItem("hyper_sanat_auth_state_v2");
+  });
   for (const event of [
     "atlas-portal-content-updated",
     "atlas-pricing-updated",
@@ -106,7 +110,7 @@ export async function hydratePortal() {
   return data;
 }
 export function persistPortalCache(key: string, value: string) {
-  localStorage.setItem(key, value);
+  durableStorage.setItem(key, value);
   if (
     !isAdmin ||
     !PORTAL_CACHE_KEYS.includes(key) ||
@@ -144,6 +148,7 @@ export function persistPortalCache(key: string, value: string) {
   }
 }
 export async function flushPortalChanges() {
+  await flushDurableChanges();
   if (saving) await saving;
   if (saveError) throw saveError;
   if (Object.keys(dirty).length)

@@ -3,15 +3,16 @@ import { ArrowLeft, RotateCcw, Smartphone } from "lucide-react";
 import { portalRequest, hydratePortal } from "../../services/portalRepository";
 import { Customer } from "../../types";
 export function PhoneLogin({
-  onSuccess,
+  onSuccess,initialPhone="",initialSent=false,
 }: {
+  initialPhone?:string;initialSent?:boolean;
   onSuccess: (user: Customer) => void;
 }) {
-  const [phone, setPhone] = useState(""),
+  const [phone, setPhone] = useState(initialPhone),
     [code, setCode] = useState(""),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [sent, setSent] = useState(false),
+  const [sent, setSent] = useState(initialSent),
     [busy, setBusy] = useState(false),
     [seconds, setSeconds] = useState(0);
   useEffect(() => {

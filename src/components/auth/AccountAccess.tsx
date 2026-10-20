@@ -31,6 +31,7 @@ export function AccountAccess({
     [error, setError] = useState("");
   const [province, setProvince] = useState(""),
     [city, setCity] = useState("");
+  const [requiresVerification,setRequiresVerification]=useState(false);
   const [details, setDetails] = useState<Partial<RegisterPayload>>({});
   const go = (user = auth.currentUser) => {
     onDone?.();
@@ -97,6 +98,7 @@ export function AccountAccess({
         setError(r.message || "اطلاعات را بررسی کنید.");
         return;
       }
+      if(r.requiresPhoneVerification){setRequiresVerification(true);setMode("login");setMethod("sms");return;}
       auth.setLatestCredentials(null);
       go(r.user || null);
     } catch {
@@ -219,7 +221,7 @@ export function AccountAccess({
           </div>
         )}
         {mode === "login" && method === "sms" ? (
-          <PhoneLogin onSuccess={go} />
+          <PhoneLogin initialPhone={requiresVerification?details.mobile:undefined} initialSent={requiresVerification} onSuccess={go} />
         ) : (
           <form onSubmit={submit} className="account-fields">
             {mode === "login" ? (
