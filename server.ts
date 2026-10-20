@@ -6491,7 +6491,7 @@ async function start() {
   });
 }
 
-start().catch(error=>{console.error("[Startup failed]",error?.name || "DatabaseError");process.exitCode=1;});
+start().catch(error=>{console.error("[Startup failed]",error?.name || "DatabaseError",error?.code || "UNCLASSIFIED");process.exitCode=1;});
 
 setTimeout(()=>{
  const origin=String(process.env.VISION_IMAGE_PUBLIC_ORIGIN || process.env.APP_URL || '').replace(/\/$/,'');
